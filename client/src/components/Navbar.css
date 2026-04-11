@@ -1,59 +1,189 @@
+/* ── NAVBAR : Holographic Floating Glass ── */
+
 .navbar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.875rem 2rem;
-  border-bottom: 1px solid rgba(0,255,255,0.08);
-  background: rgba(7,8,14,0.8);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  position: sticky; top: 0; z-index: 100;
-  box-shadow: 0 4px 30px rgba(0,0,0,0.3), 0 1px 0 rgba(0,255,255,0.05);
-  animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  background: var(--surface);
+  backdrop-filter: blur(32px) saturate(1.4);
+  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow:
+    0 4px 32px rgba(0, 0, 0, 0.28),
+    0 1px 0 rgba(138, 120, 255, 0.06),
+    inset 0 -1px 0 rgba(138, 120, 255, 0.04);
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.nav-logo {
-  font-family: var(--font-display); font-size: 1.4rem; font-weight: 700;
-  letter-spacing: 0.02em; color: var(--text);
-  display: flex; align-items: center; gap: 10px;
-  transition: transform 0.3s;
+/* Iridescent bottom shimmer */
+.navbar::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(123, 140, 255, 0.18) 20%,
+    rgba(168, 85, 247, 0.14) 45%,
+    rgba(94, 234, 212, 0.12) 70%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: gradientFlow 6s ease infinite;
+  pointer-events: none;
 }
-.nav-logo:hover { transform: scale(1.05); }
+
+.navbar:hover {
+  box-shadow:
+    0 6px 40px rgba(0, 0, 0, 0.32),
+    0 1px 0 rgba(138, 120, 255, 0.1),
+    inset 0 -1px 0 rgba(138, 120, 255, 0.06);
+}
+
+/* ── Logo ── */
+.nav-logo {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-logo:hover {
+  transform: scale(1.04);
+}
 
 .nav-dot {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent), 0 0 30px rgba(0,255,255,0.5);
-  animation: dotPulse 2s ease-in-out infinite;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  box-shadow:
+    0 0 10px rgba(123, 140, 255, 0.5),
+    0 0 28px rgba(168, 85, 247, 0.25);
+  animation: dotPulse 2.5s ease-in-out infinite;
 }
 
+/* ── Version Badge ── */
 .nav-badge {
-  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em;
-  background: rgba(0,255,255,0.06); color: var(--accent);
-  border: 1px solid rgba(0,255,255,0.2); border-radius: 20px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  background: rgba(123, 140, 255, 0.05);
+  color: var(--accent);
+  border: 1px solid rgba(123, 140, 255, 0.15);
+  border-radius: 20px;
   padding: 4px 14px;
-  animation: neonPulse 3s ease-in-out infinite;
-  transition: all 0.3s;
+  animation: iridescent 6s ease-in-out infinite;
+  transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  overflow: hidden;
+}
+.nav-badge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(168, 85, 247, 0.12),
+    transparent
+  );
+  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-badge:hover::before {
+  left: 150%;
 }
 .nav-badge:hover {
-  box-shadow: var(--glow-cyan);
+  box-shadow:
+    0 0 16px rgba(123, 140, 255, 0.15),
+    0 0 40px rgba(168, 85, 247, 0.06);
   transform: scale(1.05);
+  border-color: rgba(168, 85, 247, 0.3);
+  background: rgba(123, 140, 255, 0.08);
+  color: var(--purple-light);
 }
 
-.nav-right { display: flex; align-items: center; gap: 1.5rem; }
-.nav-divider { width: 1px; height: 28px; background: linear-gradient(180deg, transparent, rgba(0,255,255,0.2), transparent); }
+/* ── Right Section ── */
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.nav-divider {
+  width: 1px;
+  height: 28px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(168, 85, 247, 0.2),
+    rgba(94, 234, 212, 0.1),
+    transparent
+  );
+}
+
+/* ── Stats ── */
 .nav-stat {
   text-align: right;
-  transition: transform 0.3s;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.nav-stat:hover { transform: translateY(-2px); }
-.nav-stat-num {
-  font-family: var(--font-display); font-size: 1.15rem; font-weight: 600;
-  color: var(--accent); letter-spacing: -0.01em; line-height: 1;
-  text-shadow: 0 0 10px rgba(0,255,255,0.4);
+.nav-stat:hover {
+  transform: translateY(-2px);
 }
-.nav-stat-label { font-family: var(--font-mono); font-size: 9px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; }
 
+.nav-stat-num {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-shadow: 0 0 10px rgba(123, 140, 255, 0.3);
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-stat:hover .nav-stat-num {
+  text-shadow:
+    0 0 18px rgba(123, 140, 255, 0.45),
+    0 0 40px rgba(168, 85, 247, 0.12);
+  color: var(--purple-light);
+}
+
+.nav-stat-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-stat:hover .nav-stat-label {
+  color: var(--text2);
+}
+
+/* ── Responsive ── */
 @media (max-width: 600px) {
-  .nav-badge { display: none; }
-  .nav-right { gap: 1rem; }
-  .navbar { padding: 0.875rem 1rem; }
+  .nav-badge {
+    display: none;
+  }
+  .nav-right {
+    gap: 1rem;
+  }
+  .navbar {
+    padding: 0.875rem 1rem;
+  }
 }

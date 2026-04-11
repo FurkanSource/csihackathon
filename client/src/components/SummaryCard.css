@@ -1,57 +1,108 @@
+/* ── SUMMARY CARD : Holographic Glass ── */
+
 .scard {
-  background: rgba(15,17,30,0.6);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(0,255,255,0.08);
-  border-radius: var(--radius); padding: 1rem 1.25rem;
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  animation: popIn3D 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   box-shadow: 0 2px 15px rgba(0,0,0,0.2);
   position: relative;
   overflow: hidden;
   transform-style: preserve-3d;
 }
+
+/* Staggered pop-in */
 .scard:nth-child(1) { animation-delay: 0s; }
 .scard:nth-child(2) { animation-delay: 0.08s; }
 .scard:nth-child(3) { animation-delay: 0.16s; }
 .scard:nth-child(4) { animation-delay: 0.24s; }
 
+/* Iridescent top line */
 .scard::before {
   content: '';
-  position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0,255,255,0.3), transparent);
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(123,140,255,0.3) 20%,
+    rgba(168,85,247,0.25) 50%,
+    rgba(94,234,212,0.2) 80%,
+    transparent 100%);
+  background-size: 200% 100%;
+  animation: gradientFlow 5s ease infinite;
 }
+
+/* Holographic surface sheen on hover */
 .scard::after {
   content: '';
   position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(0,255,255,0.02) 0%, transparent 60%);
+  background: linear-gradient(135deg,
+    rgba(123,140,255,0.03) 0%,
+    transparent 40%,
+    rgba(168,85,247,0.02) 70%,
+    transparent 100%);
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .scard:hover::after { opacity: 1; }
 
 .scard:hover {
-  border-color: rgba(0,255,255,0.2);
-  box-shadow: 0 12px 40px rgba(0,255,255,0.1), 0 0 60px rgba(0,0,0,0.2);
+  border-color: var(--border3);
+  box-shadow:
+    0 12px 40px rgba(123,140,255,0.06),
+    0 0 50px rgba(168,85,247,0.03),
+    inset 0 1px 0 rgba(255,255,255,0.04);
   transform: perspective(600px) translateY(-6px) translateZ(15px) rotateX(3deg);
 }
 
-.scard-label { font-family: var(--font-mono); font-size: 9px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+.scard-label {
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--text3); letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+
 .scard-val {
   font-family: var(--font-display); font-size: 1.7rem; font-weight: 700;
   letter-spacing: -0.02em; line-height: 1; margin-bottom: 4px;
-  transition: text-shadow 0.3s;
+  transition: text-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
 .scard-sub { font-size: 11px; color: var(--text3); }
 
-.scard-val.c-accent { color: var(--accent); text-shadow: 0 0 15px rgba(0,255,255,0.35); }
-.scard:hover .scard-val.c-accent { text-shadow: 0 0 25px rgba(0,255,255,0.5), 0 0 50px rgba(0,255,255,0.2); }
+/* ── Color variants with soft glow on hover ── */
 
-.scard-val.c-green  { color: var(--green); text-shadow: 0 0 15px rgba(5,255,161,0.35); }
-.scard:hover .scard-val.c-green { text-shadow: 0 0 25px rgba(5,255,161,0.5), 0 0 50px rgba(5,255,161,0.2); }
+.scard-val.c-accent {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(123,140,255,0.25);
+}
+.scard:hover .scard-val.c-accent {
+  text-shadow: 0 0 20px rgba(123,140,255,0.4), 0 0 45px rgba(123,140,255,0.15);
+}
 
-.scard-val.c-gold   { color: var(--gold); text-shadow: 0 0 15px rgba(255,215,0,0.35); }
-.scard:hover .scard-val.c-gold { text-shadow: 0 0 25px rgba(255,215,0,0.5), 0 0 50px rgba(255,215,0,0.2); }
+.scard-val.c-green {
+  color: var(--green);
+  text-shadow: 0 0 12px rgba(52,211,153,0.25);
+}
+.scard:hover .scard-val.c-green {
+  text-shadow: 0 0 20px rgba(52,211,153,0.4), 0 0 45px rgba(52,211,153,0.15);
+}
 
-.scard-val.c-purple { color: var(--purple-light); text-shadow: 0 0 15px rgba(167,139,250,0.35); }
-.scard:hover .scard-val.c-purple { text-shadow: 0 0 25px rgba(167,139,250,0.5), 0 0 50px rgba(167,139,250,0.2); }
+.scard-val.c-gold {
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(251,191,36,0.25);
+}
+.scard:hover .scard-val.c-gold {
+  text-shadow: 0 0 20px rgba(251,191,36,0.4), 0 0 45px rgba(251,191,36,0.15);
+}
+
+.scard-val.c-purple {
+  color: var(--purple-light);
+  text-shadow: 0 0 12px rgba(192,132,252,0.25);
+}
+.scard:hover .scard-val.c-purple {
+  text-shadow: 0 0 20px rgba(192,132,252,0.4), 0 0 45px rgba(192,132,252,0.15);
+}
