@@ -1,0 +1,40 @@
+.loading-screen {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: calc(100vh - 57px); text-align: center; padding: 2rem;
+}
+
+.scan-wrap {
+  position: relative; width: 110px; height: 110px;
+  margin: 0 auto 2rem;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.scan-ring {
+  position: absolute; border-radius: 50%; border: 1px solid;
+  animation: spinRing 3s linear infinite;
+}
+.scan-ring.r1 { width: 110px; height: 110px; border-color: rgba(0,212,255,0.2); animation-duration: 4s; }
+.scan-ring.r2 { width: 78px;  height: 78px;  border-color: rgba(0,212,255,0.4); animation-duration: 2.5s; animation-direction: reverse; }
+.scan-ring.r3 { width: 48px;  height: 48px;  border-color: var(--accent); animation-duration: 1.5s; }
+
+.scan-core {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 24px var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--bg); z-index: 1;
+  animation: corePulse 1s ease-in-out infinite alternate;
+}
+
+.loading-title { font-family: var(--font-display); font-size: 2rem; color: var(--text); letter-spacing: 0.03em; margin-bottom: 6px; }
+.loading-sub   { font-size: 13px; color: var(--text2); margin-bottom: 1.5rem; min-height: 20px; }
+
+.progress-wrap { height: 3px; background: var(--border); border-radius: 2px; width: 320px; max-width: 90vw; margin: 0 auto 1.5rem; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); border-radius: 2px; transition: width 0.4s ease; }
+
+.log-list  { display: flex; flex-direction: column; gap: 8px; width: 280px; max-width: 90vw; }
+.log-item  { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text3); transition: color 0.3s; }
+.log-dot   { width: 6px; height: 6px; border-radius: 50%; background: var(--text4); flex-shrink: 0; transition: background 0.3s, box-shadow 0.3s; }
+.log-item.active      { color: var(--accent); }
+.log-item.active .log-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.log-item.done        { color: var(--green); }
+.log-item.done .log-dot { background: var(--green); }
