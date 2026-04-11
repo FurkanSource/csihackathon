@@ -1,7 +1,7 @@
 /**
  * SmartLead — app.js
- * Person 2 (Backend/Logic) owns this file
- * Handles: lead generation, scoring, rendering, DB, canvas, exports
+ * Handles: lead generation via OpenRouter + Claude, geolocation,
+ *          rendering, filtering, sorting, DB panel, CSV export, canvas
  */
 
 'use strict';
@@ -11,8 +11,9 @@ const CONFIG = {
   SIMULATE_DELAY_MS: 2800,
   STEP_INTERVAL_MS:  520,
   NUM_LEADS:         5,
-  CLAUDE_KEY:        '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',
-  CLAUDE_URL:        'https://api.anthropic.com/v1/messages'
+  OR_KEY:            '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',
+  OR_URL:            'https://openrouter.ai/api/v1/chat/completions',
+  OR_MODEL:          'anthropic/claude-sonnet-4-5'
 };
 
 // ── GEOLOCATION via ipapi.co ────────────────────────────────────────────
@@ -24,19 +25,19 @@ const GeoLocation = {
       const res  = await fetch('https://ipapi.co/json/');
       const json = await res.json();
       this.data  = {
-        city:      json.city      || '',
-        region:    json.region    || '',
-        country:   json.country_name || '',
+        city:        json.city         || '',
+        region:      json.region       || '',
+        country:     json.country_name || '',
         countryCode: json.country_code || '',
-        latitude:  json.latitude  || null,
-        longitude: json.longitude || null,
-        timezone:  json.timezone  || '',
-        currency:  json.currency  || '',
-        org:       json.org       || ''
+        latitude:    json.latitude     || null,
+        longitude:   json.longitude    || null,
+        timezone:    json.timezone     || '',
+        currency:    json.currency     || '',
+        org:         json.org          || ''
       };
       return this.data;
     } catch (e) {
-      console.warn('ipapi.co geolocation failed, continuing without it.', e);
+      console.warn('GeoLocation: ipapi.co failed, continuing without location.', e);
       this.data = null;
       return null;
     }
@@ -44,22 +45,22 @@ const GeoLocation = {
 
   label() {
     if (!this.data) return '';
-    const { city, region, country } = this.data;
-    return [city, region, country].filter(Boolean).join(', ');
+    return [this.data.city, this.data.region, this.data.country]
+      .filter(Boolean).join(', ');
   }
 };
 
-// ── CLAUDE LEAD GENERATION ─────────────────────────────────────────────
-async function generateWithClaude(biz, target, service, location, dealSize) {
+// ── LEAD GENERATION via OpenRouter + Claude ─────────────────────────────
+async function generateLeads(biz, target, service, location, dealSize) {
   const geoLabel   = location || GeoLocation.label() || 'Not specified';
   const geoContext = GeoLocation.data
-    ? `Detected user location: ${geoLabel} (lat: ${GeoLocation.data.latitude}, lng: ${GeoLocation.data.longitude}). Use this to find leads in or near this area.`
+    ? `Detected user location: ${geoLabel} (lat: ${GeoLocation.data.latitude}, lng: ${GeoLocation.data.longitude}). Prioritise leads in or near this area.`
     : `User-specified location: ${geoLabel}`;
 
   const dealRanges = {
-    small:      '$500–$2,000/month',
-    medium:     '$2,000–$10,000/month',
-    large:      '$10,000–$50,000/month',
+    small:      '$500-$2,000/month',
+    medium:     '$2,000-$10,000/month',
+    large:      '$10,000-$50,000/month',
     enterprise: '$50,000+/month'
   };
 
@@ -75,14 +76,14 @@ Return ONLY a valid JSON array. No markdown, no explanation, no code fences. Eac
 {
   "name": "Realistic company name",
   "industry": "Specific industry sector",
-  "size": "e.g. 11–50 employees",
-  "city": "City, Region/State based on the detected location",
+  "size": "e.g. 11-50 employees",
+  "city": "City, Region based on detected location",
   "decisionMaker": "Job title of the decision maker",
-  "score": <integer between 40 and 97>,
-  "monthly": <integer monthly deal value in USD matching the deal size range>,
-  "annual": <monthly * 12>,
+  "score": <integer 40-97>,
+  "monthly": <integer monthly deal value in USD within the deal size range>,
+  "annual": <monthly multiplied by 12>,
   "painPoint": "One sentence describing their main pain point relevant to the service",
-  "reason": "2-3 sentence explanation of why this company is a strong lead for the service offered",
+  "reason": "2-3 sentences explaining why this company is a strong lead",
   "outreach": [
     "Step 1 outreach action",
     "Step 2 outreach action",
@@ -92,45 +93,44 @@ Return ONLY a valid JSON array. No markdown, no explanation, no code fences. Eac
   "signals": ["Signal 1", "Signal 2", "Signal 3"]
 }
 
-Make companies feel real and location-specific. Higher scores = stronger fit. Vary the scores naturally.`;
+Make companies feel real and location-specific. Higher scores mean stronger fit. Vary scores naturally across the 5 leads.`;
 
-  const res = await fetch(CONFIG.CLAUDE_URL, {
+  const res = await fetch(CONFIG.OR_URL, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': CONFIG.CLAUDE_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${CONFIG.OR_KEY}`,
+      'HTTP-Referer':  window.location.href,
+      'X-Title':       'SmartLead'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-5',
+      model:      CONFIG.OR_MODEL,
       max_tokens: 2048,
-      messages: [{ role: 'user', content: prompt }]
+      messages:   [{ role: 'user', content: prompt }]
     })
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Claude API error ${res.status}`);
+    throw new Error(err?.error?.message || `API error ${res.status}`);
   }
 
   const data  = await res.json();
-  const raw   = data?.content?.[0]?.text || '';
+  const raw   = data?.choices?.[0]?.message?.content || '';
   const clean = raw.replace(/```json|```/g, '').trim();
   const leads = JSON.parse(clean);
 
-  if (!Array.isArray(leads) || leads.length === 0) throw new Error('No leads returned from Claude.');
+  if (!Array.isArray(leads) || leads.length === 0) {
+    throw new Error('No leads returned. Please try again.');
+  }
 
   return leads.sort((a, b) => b.score - a.score);
 }
 
 // ── UTILITIES ──────────────────────────────────────────────────────────
-const rand    = (arr) => arr[Math.floor(Math.random() * arr.length)];
-const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-
 function formatMoney(n) {
   if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000)     return '$' + (n / 1_000).toFixed(0) + 'K';
+  if (n >= 1_000)     return '$' + Math.round(n / 1_000) + 'K';
   return '$' + n;
 }
 
@@ -139,10 +139,10 @@ function formatDate(d = new Date()) {
 }
 
 function getScoreMeta(score) {
-  if (score >= 85) return { label: 'Hot Lead',  stroke: '#10b981', color: '#10b981' };
-  if (score >= 70) return { label: 'Strong',    stroke: '#00d4ff', color: '#00d4ff' };
-  if (score >= 55) return { label: 'Warm',      stroke: '#f59e0b', color: '#f59e0b' };
-  return               { label: 'Cold',      stroke: '#ef4444', color: '#ef4444' };
+  if (score >= 85) return { label: 'Hot Lead', stroke: '#10b981', color: '#10b981' };
+  if (score >= 70) return { label: 'Strong',   stroke: '#00d4ff', color: '#00d4ff' };
+  if (score >= 55) return { label: 'Warm',     stroke: '#f59e0b', color: '#f59e0b' };
+  return               { label: 'Cold',    stroke: '#ef4444', color: '#ef4444' };
 }
 
 // ── STATE ──────────────────────────────────────────────────────────────
@@ -170,11 +170,11 @@ function showScreen(id) {
 
 // ── LOADING SEQUENCE ───────────────────────────────────────────────────
 const LOG_STEPS = [
-  { sub: 'Detecting your location...',                pct: 12 },
-  { sub: 'Analyzing your business profile...',        pct: 28 },
-  { sub: 'Cross-referencing local companies...',      pct: 48 },
-  { sub: 'Running AI qualification engine...',        pct: 70 },
-  { sub: 'Generating personalized strategies...',     pct: 88 }
+  { sub: 'Detecting your location...',            pct: 12 },
+  { sub: 'Analysing your business profile...',    pct: 28 },
+  { sub: 'Cross-referencing local companies...',  pct: 48 },
+  { sub: 'Running AI qualification engine...',    pct: 70 },
+  { sub: 'Generating personalised strategies...', pct: 88 }
 ];
 
 function startLoading() {
@@ -184,7 +184,7 @@ function startLoading() {
     if (el) el.className = 'log-item';
   });
   setProgress(5);
-  document.getElementById('loading-sub').textContent = 'Initializing lead discovery engine...';
+  document.getElementById('loading-sub').textContent = 'Initialising lead discovery engine...';
   activateLogStep(0);
 
   State.loadTimer = setInterval(() => {
@@ -213,6 +213,7 @@ function doneLogStep(i) {
 
 function stopLoading() {
   clearInterval(State.loadTimer);
+  State.loadTimer = null;
   LOG_STEPS.forEach((_, i) => doneLogStep(i));
   setProgress(100);
 }
@@ -224,33 +225,27 @@ function setProgress(pct) {
 
 // ── RENDER RESULTS ─────────────────────────────────────────────────────
 function renderResults(leads, meta) {
-  const { biz, location, dealSize } = meta;
-  const loc           = location || GeoLocation.label() || 'Detected Location';
+  const loc           = meta.location || GeoLocation.label() || 'Detected Location';
   const totalPipeline = leads.reduce((s, l) => s + l.annual, 0);
   const avgScore      = Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length);
   const hotCount      = leads.filter(l => l.score >= 85).length;
 
-  // Nav
   document.getElementById('nav-leads-found').textContent    = leads.length;
   document.getElementById('nav-total-pipeline').textContent = formatMoney(totalPipeline);
+  document.getElementById('results-title').textContent      = `Lead Report - ${meta.biz}`;
+  document.getElementById('results-meta').textContent       = `${leads.length} leads · ${loc} · Generated ${formatDate()}`;
 
-  // Header
-  document.getElementById('results-title').textContent = `Lead Report — ${biz}`;
-  document.getElementById('results-meta').textContent  = `${leads.length} leads · ${loc} · Generated ${formatDate()}`;
-
-  // Summary cards
   document.getElementById('summary-grid').innerHTML = [
-    { label: 'Total Pipeline',  val: formatMoney(totalPipeline), cls: 'c-green',  sub: 'Annual potential' },
-    { label: 'Avg Lead Score',  val: `${avgScore}/100`,          cls: 'c-accent', sub: 'Quality index' },
-    { label: 'Hot Leads',       val: hotCount,                   cls: 'c-gold',   sub: 'Score ≥ 85' },
-    { label: 'Top Opportunity', val: formatMoney(leads[0].annual), cls: 'c-purple', sub: leads[0].name }
+    { label: 'Total Pipeline',  val: formatMoney(totalPipeline),   cls: 'c-green',  sub: 'Annual potential' },
+    { label: 'Avg Lead Score',  val: `${avgScore}/100`,            cls: 'c-accent', sub: 'Quality index'    },
+    { label: 'Hot Leads',       val: hotCount,                     cls: 'c-gold',   sub: 'Score 85+'        },
+    { label: 'Top Opportunity', val: formatMoney(leads[0].annual), cls: 'c-purple', sub: leads[0].name      }
   ].map(s => `
     <div class="scard">
       <div class="scard-label">${s.label}</div>
       <div class="scard-val ${s.cls}">${s.val}</div>
       <div class="scard-sub">${s.sub}</div>
-    </div>
-  `).join('');
+    </div>`).join('');
 
   renderLeadCards(leads);
 }
@@ -260,11 +255,10 @@ function renderLeadCards(leads) {
   grid.innerHTML = '';
 
   leads.forEach((lead, i) => {
-    const meta   = getScoreMeta(lead.score);
-    const circ   = 2 * Math.PI * 30;
-    const offset = circ * (1 - lead.score / 100);
-    const isTop  = i === 0;
-    const delay  = (i * 0.07).toFixed(2);
+    const meta  = getScoreMeta(lead.score);
+    const circ  = 2 * Math.PI * 30;
+    const isTop = i === 0;
+    const delay = (i * 0.07).toFixed(2);
 
     const card = document.createElement('div');
     card.className = 'lead-card';
@@ -292,7 +286,10 @@ function renderLeadCards(leads) {
           <div class="expand-grid">
             <div class="ebox">
               <div class="ebox-label">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="1" x2="12" y2="23"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
                 Deal Valuation
               </div>
               <div class="deal-val">${formatMoney(lead.monthly)}<span>/mo</span></div>
@@ -300,7 +297,10 @@ function renderLeadCards(leads) {
             </div>
             <div class="ebox">
               <div class="ebox-label">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                  <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
                 Outreach Strategy
               </div>
               <div class="outreach-list">
@@ -313,7 +313,9 @@ function renderLeadCards(leads) {
             </div>
             <div class="ebox">
               <div class="ebox-label">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                </svg>
                 Buying Signals
               </div>
               <div class="signals-list">
@@ -340,16 +342,16 @@ function renderLeadCards(leads) {
           <div class="score-num" style="color:${meta.color}">${lead.score}</div>
         </div>
         <div class="score-badge-label" style="color:${meta.color}">${meta.label}</div>
-      </div>
-    `;
+      </div>`;
 
     card.addEventListener('click', () => SmartLead.toggleExpand(i, card));
     grid.appendChild(card);
 
+    // Animate score ring after paint
     requestAnimationFrame(() => {
       setTimeout(() => {
         const ring = document.getElementById(`ring-${i}`);
-        if (ring) ring.style.strokeDashoffset = (2 * Math.PI * 30 * (1 - lead.score / 100)).toFixed(2);
+        if (ring) ring.style.strokeDashoffset = (circ * (1 - lead.score / 100)).toFixed(2);
       }, 80 + i * 120);
     });
   });
@@ -377,15 +379,14 @@ const SmartLead = {
     const meta = { biz, target, service, location, dealSize };
 
     try {
-      // Step 1: Detect location silently (if user didn't provide one)
+      // Silently detect location if not manually provided and not already cached
       if (!location && !GeoLocation.data) {
         await GeoLocation.detect();
       }
 
-      // Step 2: Generate leads with Claude + location context
-      // Run loading animation in parallel — wait for whichever takes longer
+      // Run API call and minimum loading animation in parallel
       const [leads] = await Promise.all([
-        generateWithClaude(biz, target, service, location, dealSize),
+        generateLeads(biz, target, service, location, dealSize),
         new Promise(resolve => setTimeout(resolve, CONFIG.SIMULATE_DELAY_MS))
       ]);
 
@@ -399,8 +400,8 @@ const SmartLead = {
 
     } catch (err) {
       stopLoading();
-      console.error('SmartLead generation error:', err);
-      alert(`Lead generation failed: ${err.message}\n\nCheck your API key or network connection.`);
+      console.error('SmartLead error:', err);
+      alert(`Lead generation failed: ${err.message}\n\nCheck your connection and try again.`);
       document.getElementById('forge-btn').disabled = false;
       showScreen('input-screen');
     }
@@ -408,9 +409,9 @@ const SmartLead = {
 
   loadSample(i) {
     const samples = [
-      { biz: 'Digital Marketing Agency', target: 'Small restaurants and cafés', service: 'Social media management & paid ads', location: '', deal: 'medium' },
-      { biz: 'SaaS Product Company',     target: 'Mid-size B2B tech teams',      service: 'Project management software',       location: '', deal: 'large' },
-      { biz: 'Healthcare Consultancy',   target: 'Private clinics and GP surgeries', service: 'Operations & compliance consulting', location: '', deal: 'large' }
+      { biz: 'Digital Marketing Agency', target: 'Small restaurants and cafes',      service: 'Social media management & paid ads',  location: '', deal: 'medium' },
+      { biz: 'SaaS Product Company',     target: 'Mid-size B2B tech teams',          service: 'Project management software',         location: '', deal: 'large'  },
+      { biz: 'Healthcare Consultancy',   target: 'Private clinics and GP surgeries', service: 'Operations & compliance consulting',  location: '', deal: 'large'  }
     ];
     const s = samples[i];
     document.getElementById('biz-type').value  = s.biz;
@@ -437,8 +438,13 @@ const SmartLead = {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
-    const map = { all: () => true, hot: l => l.score >= 85, strong: l => l.score >= 70, warm: l => l.score >= 55 };
-    State.filtered = State.leads.filter(map[type] || map.all);
+    const rules = {
+      all:    () => true,
+      hot:    l  => l.score >= 85,
+      strong: l  => l.score >= 70,
+      warm:   l  => l.score >= 55
+    };
+    State.filtered = State.leads.filter(rules[type] || rules.all);
     renderLeadCards(State.filtered);
   },
 
@@ -460,8 +466,9 @@ const SmartLead = {
       }
     });
     this.renderDB();
-    document.getElementById('db-panel').style.display = 'block';
-    document.getElementById('db-panel').scrollIntoView({ behavior: 'smooth' });
+    const panel = document.getElementById('db-panel');
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth' });
   },
 
   renderDB() {
@@ -483,30 +490,32 @@ const SmartLead = {
     const headers = ['Rank','Company','Score','Industry','Location','Size','Decision Maker','Monthly Value','Annual Value','Pain Point'];
     const rows = State.leads.map((l, i) => [
       i + 1, l.name, l.score, l.industry, l.city, l.size,
-      l.decisionMaker, formatMoney(l.monthly), formatMoney(l.annual), `"${l.painPoint}"`
+      l.decisionMaker, formatMoney(l.monthly), formatMoney(l.annual),
+      `"${(l.painPoint || '').replace(/"/g, '""')}"`
     ]);
     const csv  = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href = url; a.download = `smartlead-${Date.now()}.csv`; a.click();
+    a.href     = url;
+    a.download = `smartlead-export-${Date.now()}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
   },
 
   reset() {
     State.leads    = [];
     State.filtered = [];
-    document.getElementById('forge-btn').disabled = false;
+    State.meta     = {};
+    document.getElementById('forge-btn').disabled             = false;
     document.getElementById('nav-leads-found').textContent    = '0';
     document.getElementById('nav-total-pipeline').textContent = '$0';
-    document.getElementById('db-panel').style.display = 'none';
+    document.getElementById('db-panel').style.display         = 'none';
     showScreen('input-screen');
   }
 };
 
-// ── SILENT LOCATION PREFETCH ON PAGE LOAD ──────────────────────────────
-// Detect location in the background as soon as the page loads
-// so it's ready instantly when the user hits Generate
+// ── PREFETCH LOCATION SILENTLY ON PAGE LOAD ────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   GeoLocation.detect();
 });
@@ -515,19 +524,15 @@ window.addEventListener('DOMContentLoaded', () => {
 (function initCanvas() {
   const canvas = document.getElementById('bg-canvas');
   if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let W, H;
-  const MAX_NODES = 40;
+
+  const ctx          = canvas.getContext('2d');
+  const MAX_NODES    = 40;
   const CONNECT_DIST = 140;
-  let nodes = [];
+  let W, H, nodes    = [];
 
   function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-    buildGraph();
-  }
-
-  function buildGraph() {
+    W     = canvas.width  = window.innerWidth;
+    H     = canvas.height = window.innerHeight;
     nodes = Array.from({ length: MAX_NODES }, () => ({
       x:  Math.random() * W,
       y:  Math.random() * H,
@@ -552,11 +557,10 @@ window.addEventListener('DOMContentLoaded', () => {
         const dy   = nodes[i].y - nodes[j].y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < CONNECT_DIST) {
-          const alpha = (1 - dist / CONNECT_DIST) * 0.12;
           ctx.beginPath();
           ctx.moveTo(nodes[i].x, nodes[i].y);
           ctx.lineTo(nodes[j].x, nodes[j].y);
-          ctx.strokeStyle = `rgba(0,212,255,${alpha})`;
+          ctx.strokeStyle = `rgba(0,212,255,${(1 - dist / CONNECT_DIST) * 0.12})`;
           ctx.lineWidth   = 0.5;
           ctx.stroke();
         }
