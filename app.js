@@ -11,8 +11,8 @@ const CONFIG = {
   SIMULATE_DELAY_MS: 2800,
   STEP_INTERVAL_MS:  520,
   NUM_LEADS:         5,
-  GEMINI_KEY:        'AIzaSyAhxL8PsfqcQVx33MJWvyOZBBQ7Pm4GpOc',
-  GEMINI_URL:        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
+  CLAUDE_KEY:        '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',
+  CLAUDE_URL:        'https://api.anthropic.com/v1/messages'
 };
 
 // ── GEOLOCATION via ipapi.co ────────────────────────────────────────────
@@ -49,10 +49,10 @@ const GeoLocation = {
   }
 };
 
-// ── GEMINI LEAD GENERATION ──────────────────────────────────────────────
-async function generateWithGemini(biz, target, service, location, dealSize) {
-  const geoLabel    = location || GeoLocation.label() || 'Not specified';
-  const geoContext  = GeoLocation.data
+// ── CLAUDE LEAD GENERATION ─────────────────────────────────────────────
+async function generateWithClaude(biz, target, service, location, dealSize) {
+  const geoLabel   = location || GeoLocation.label() || 'Not specified';
+  const geoContext = GeoLocation.data
     ? `Detected user location: ${geoLabel} (lat: ${GeoLocation.data.latitude}, lng: ${GeoLocation.data.longitude}). Use this to find leads in or near this area.`
     : `User-specified location: ${geoLabel}`;
 
@@ -82,7 +82,7 @@ Return ONLY a valid JSON array. No markdown, no explanation, no code fences. Eac
   "monthly": <integer monthly deal value in USD matching the deal size range>,
   "annual": <monthly * 12>,
   "painPoint": "One sentence describing their main pain point relevant to the service",
-  "reason": "2–3 sentence explanation of why this company is a strong lead for the service offered",
+  "reason": "2-3 sentence explanation of why this company is a strong lead for the service offered",
   "outreach": [
     "Step 1 outreach action",
     "Step 2 outreach action",
@@ -94,26 +94,32 @@ Return ONLY a valid JSON array. No markdown, no explanation, no code fences. Eac
 
 Make companies feel real and location-specific. Higher scores = stronger fit. Vary the scores naturally.`;
 
-  const res = await fetch(`${CONFIG.GEMINI_URL}?key=${CONFIG.GEMINI_KEY}`, {
+  const res = await fetch(CONFIG.CLAUDE_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': CONFIG.CLAUDE_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.85, maxOutputTokens: 2048 }
+      model: 'claude-sonnet-4-5',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: prompt }]
     })
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Gemini API error ${res.status}`);
+    throw new Error(err?.error?.message || `Claude API error ${res.status}`);
   }
 
-  const data   = await res.json();
-  const raw    = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const clean  = raw.replace(/```json|```/g, '').trim();
-  const leads  = JSON.parse(clean);
+  const data  = await res.json();
+  const raw   = data?.content?.[0]?.text || '';
+  const clean = raw.replace(/```json|```/g, '').trim();
+  const leads = JSON.parse(clean);
 
-  if (!Array.isArray(leads) || leads.length === 0) throw new Error('No leads returned from Gemini.');
+  if (!Array.isArray(leads) || leads.length === 0) throw new Error('No leads returned from Claude.');
 
   return leads.sort((a, b) => b.score - a.score);
 }
@@ -376,10 +382,10 @@ const SmartLead = {
         await GeoLocation.detect();
       }
 
-      // Step 2: Generate leads with Gemini + location context
+      // Step 2: Generate leads with Claude + location context
       // Run loading animation in parallel — wait for whichever takes longer
       const [leads] = await Promise.all([
-        generateWithGemini(biz, target, service, location, dealSize),
+        generateWithClaude(biz, target, service, location, dealSize),
         new Promise(resolve => setTimeout(resolve, CONFIG.SIMULATE_DELAY_MS))
       ]);
 
