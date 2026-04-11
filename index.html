@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SmartLead — AI Lead Discovery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div id="app">
+
+  <!-- NAV -->
+  <nav id="navbar">
+    <div class="nav-logo">
+      <div class="nav-dot"></div>
+      SmartLead
+    </div>
+    <span class="nav-badge">AI LEAD ENGINE v2.0</span>
+    <div class="nav-right">
+      <div class="nav-stat">
+        <div class="nav-stat-num" id="nav-total-pipeline">$0</div>
+        <div class="nav-stat-label">pipeline value</div>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-stat">
+        <div class="nav-stat-num" id="nav-leads-found">0</div>
+        <div class="nav-stat-label">leads found</div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- INPUT SCREEN -->
+  <section id="input-screen" class="screen active">
+    <div class="hero-layout">
+      <div class="hero-left">
+        <div class="hero-eyebrow">Business Lead Intelligence</div>
+        <h1 class="hero-title">Find your<br><span class="hero-accent">next client.</span></h1>
+        <p class="hero-desc">SmartLead uses AI to discover, score, and qualify the highest-value leads for your business — with personalized outreach strategies ready to go.</p>
+        <div class="hero-pills">
+          <span class="pill">⚡ AI-Powered Scoring</span>
+          <span class="pill">🎯 Smart Qualification</span>
+          <span class="pill">📊 Deal Forecasting</span>
+        </div>
+        <div class="hero-metrics">
+          <div class="hmetric"><div class="hmetric-val">94<span>%</span></div><div class="hmetric-label">Match accuracy</div></div>
+          <div class="hmetric-div"></div>
+          <div class="hmetric"><div class="hmetric-val">5<span>x</span></div><div class="hmetric-label">Faster discovery</div></div>
+          <div class="hmetric-div"></div>
+          <div class="hmetric"><div class="hmetric-val">$2M<span>+</span></div><div class="hmetric-label">Pipeline generated</div></div>
+        </div>
+      </div>
+      <div class="hero-right">
+        <div class="form-card">
+          <div class="form-card-bar"></div>
+          <div class="form-header">
+            <div class="form-dots">
+              <span class="fdot red"></span>
+              <span class="fdot yellow"></span>
+              <span class="fdot green"></span>
+            </div>
+            <span class="form-title-label">lead_search.config</span>
+          </div>
+
+          <div class="field">
+            <label>Business Type</label>
+            <input type="text" id="biz-type" placeholder="e.g. Digital Marketing Agency"/>
+          </div>
+          <div class="field">
+            <label>Target Customer</label>
+            <input type="text" id="target" placeholder="e.g. Small restaurants and cafés"/>
+          </div>
+          <div class="field">
+            <label>Service Offered</label>
+            <input type="text" id="service" placeholder="e.g. Social media management & paid ads"/>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Location (optional)</label>
+              <input type="text" id="location" placeholder="e.g. Miami, FL"/>
+            </div>
+            <div class="field">
+              <label>Deal Size Target</label>
+              <select id="deal-size">
+                <option value="small">$500–$2K/mo</option>
+                <option value="medium" selected>$2K–$10K/mo</option>
+                <option value="large">$10K–$50K/mo</option>
+                <option value="enterprise">$50K+/mo</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="forge-btn" id="forge-btn" onclick="SmartLead.generate()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <span id="btn-label">Discover Leads</span>
+          </button>
+
+          <div class="sample-row">
+            <span class="sample-label">Quick fill:</span>
+            <button class="chip" onclick="SmartLead.loadSample(0)">🏪 Local Agency</button>
+            <button class="chip" onclick="SmartLead.loadSample(1)">💻 SaaS Startup</button>
+            <button class="chip" onclick="SmartLead.loadSample(2)">🏥 Healthcare</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOADING SCREEN -->
+  <section id="loading-screen" class="screen">
+    <div class="loading-center">
+      <div class="scan-wrap">
+        <div class="scan-ring r1"></div>
+        <div class="scan-ring r2"></div>
+        <div class="scan-ring r3"></div>
+        <div class="scan-core">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+      </div>
+      <h2 class="loading-title" id="loading-title">Scanning the market...</h2>
+      <p class="loading-sub" id="loading-sub">Initializing lead discovery engine</p>
+      <div class="progress-wrap"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="log-list" id="log-list">
+        <div class="log-item" id="log-0"><span class="log-dot"></span>Analyzing business profile</div>
+        <div class="log-item" id="log-1"><span class="log-dot"></span>Cross-referencing 50,000+ companies</div>
+        <div class="log-item" id="log-2"><span class="log-dot"></span>Running qualification algorithms</div>
+        <div class="log-item" id="log-3"><span class="log-dot"></span>Generating outreach strategies</div>
+        <div class="log-item" id="log-4"><span class="log-dot"></span>Calculating deal valuations</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS SCREEN -->
+  <section id="results-screen" class="screen">
+
+    <div class="results-topbar">
+      <div>
+        <div class="results-eyebrow">Lead Intelligence Report</div>
+        <h2 class="results-title" id="results-title">Results</h2>
+        <p class="results-meta" id="results-meta"></p>
+      </div>
+      <div class="results-actions">
+        <button class="action-btn" onclick="SmartLead.exportCSV()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+        <button class="action-btn" onclick="SmartLead.saveToDB()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          Save to DB
+        </button>
+        <button class="action-btn primary" onclick="SmartLead.reset()">← New Search</button>
+      </div>
+    </div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="summary-grid" id="summary-grid"></div>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+      <span class="filter-label">Filter by score:</span>
+      <button class="filter-btn active" data-filter="all" onclick="SmartLead.filter('all',this)">All</button>
+      <button class="filter-btn" data-filter="hot" onclick="SmartLead.filter('hot',this)">🔥 Hot (85+)</button>
+      <button class="filter-btn" data-filter="strong" onclick="SmartLead.filter('strong',this)">💎 Strong (70+)</button>
+      <button class="filter-btn" data-filter="warm" onclick="SmartLead.filter('warm',this)">⚡ Warm (55+)</button>
+      <div class="filter-right">
+        <span class="filter-label">Sort:</span>
+        <select class="filter-select" onchange="SmartLead.sort(this.value)">
+          <option value="score">Score ↓</option>
+          <option value="deal">Deal Value ↓</option>
+          <option value="name">Name A–Z</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- LEAD CARDS -->
+    <div class="leads-grid" id="leads-grid"></div>
+
+    <!-- DB PANEL -->
+    <div class="db-panel" id="db-panel" style="display:none">
+      <div class="db-panel-header">
+        <div class="db-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          Saved Leads Database
+        </div>
+        <button class="db-close" onclick="document.getElementById('db-panel').style.display='none'">✕</button>
+      </div>
+      <div class="db-table-wrap">
+        <table class="db-table" id="db-table">
+          <thead><tr><th>Company</th><th>Score</th><th>Industry</th><th>Deal/mo</th><th>Saved</th></tr></thead>
+          <tbody id="db-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+</div><!-- /app -->
+
+<script src="app.js"></script>
+</body>
+</html>
