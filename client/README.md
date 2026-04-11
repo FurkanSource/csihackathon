@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # ⚡ SmartLead
 ### Built at Dolphin Hacks 2025 — Business Track
 
@@ -149,41 +148,3 @@ Merge into `main` at Hour 6 and Hour 10. Person 3 coordinates merges.
 
 ## 🏁 Hackathon Info
 - **Event:** Dolphin Hacks 2025 · Business Track · 12 hours
-=======
-You are a startup product engineer.
-
-Build a hackathon-winning web app called "SmartLead".
-
-Concept:
-A business lead discovery and qualification tool.
-
-Inputs:
-Business type
-Target customer
-Service offered
-Location (optional)
-
-Outputs:
-List of 5 potential leads (simulated)
-Lead score (0-100)
-Reason they are a good lead
-Suggested outreach strategy
-Estimated deal value
-
-UI:
-Dark SaaS dashboard
-Lead cards
-Score badges
-Clean modern design
-Responsive
-
-Technical:
-HTML CSS JavaScript only
-No backend
-Use mock lead data
-Simulate scoring logic
-
-Make it visually impressive for judges.
-
-Return full working code.
->>>>>>> eb0f96d58939b09595cf0fc01102059cb8085e68
