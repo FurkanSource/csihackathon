@@ -370,6 +370,100 @@
 .db-table tr:last-child td { border-bottom: none; }
 .db-table tr:hover td { background: rgba(0,255,255,0.04); color: var(--text); transform: translateX(3px); }
 
+/* ── PARTICLE BURST ── */
+.particle-burst {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  animation: burstOut 0.7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  box-shadow: 0 0 6px currentColor;
+}
+
+@keyframes burstOut {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+
+/* ── CLICK RIPPLE ── */
+.ripple-btn { position: relative; overflow: hidden; }
+.click-ripple {
+  position: absolute;
+  width: 200px; height: 200px;
+  margin-left: -100px; margin-top: -100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+  pointer-events: none;
+  animation: rippleExpand 0.6s ease-out forwards;
+  z-index: 10;
+}
+
+@keyframes rippleExpand {
+  0%   { transform: scale(0); opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* ── SCREEN TRANSITIONS ── */
+.screen-transition {
+  position: fixed; inset: 0;
+  z-index: 9990;
+  pointer-events: none;
+}
+
+/* Wipe transition */
+.screen-transition.wipe::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(0,255,255,0.15), rgba(124,58,237,0.15), rgba(255,0,110,0.1));
+  animation: wipeAcross 0.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@keyframes wipeAcross {
+  0%   { clip-path: inset(0 100% 0 0); }
+  50%  { clip-path: inset(0 0 0 0); }
+  100% { clip-path: inset(0 0 0 100%); }
+}
+
+/* Bubble transition */
+.screen-transition.bubble {
+  display: flex; align-items: center; justify-content: center;
+}
+.transition-bubble {
+  position: absolute;
+  width: 0; height: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,255,255,0.12), rgba(124,58,237,0.08), transparent 70%);
+  animation: bubbleExpand 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes bubbleExpand {
+  0%   { width: 0; height: 0; opacity: 1; }
+  60%  { opacity: 0.8; }
+  100% { width: var(--size); height: var(--size); opacity: 0; }
+}
+
+/* ── HOVER SPARKLE ON PILLS ── */
+.pill { position: relative; overflow: hidden; }
+.pill::after {
+  content: '';
+  position: absolute; top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,255,255,0.15), transparent);
+  transition: left 0.5s;
+}
+.pill:hover::after { left: 150%; }
+
+/* ── HOVER SPARKLE ON CHIPS ── */
+.chip { position: relative; overflow: hidden; }
+.chip::after {
+  content: '';
+  position: absolute; top: 0; left: -100%;
+  width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,255,255,0.2), transparent);
+  transition: left 0.4s;
+}
+.chip:hover::after { left: 150%; }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 960px) {
   .hero-layout { grid-template-columns: 1fr; gap: 2rem; }

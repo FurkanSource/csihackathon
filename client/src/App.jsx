@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
 
 import Navbar        from './components/Navbar'
@@ -60,6 +60,36 @@ const IconX = ({ size = 14 }) => (
   </svg>
 )
 
+/* ── Particle Burst Effect ── */
+function spawnBurst(x, y, container) {
+  const colors = ['#00FFFF', '#7C3AED', '#FF006E', '#05FFA1', '#FFD700']
+  for (let i = 0; i < 24; i++) {
+    const p = document.createElement('div')
+    p.className = 'particle-burst'
+    const angle = (Math.PI * 2 * i) / 24 + (Math.random() - 0.5) * 0.5
+    const dist = 60 + Math.random() * 80
+    const size = 3 + Math.random() * 5
+    p.style.cssText = `
+      left:${x}px; top:${y}px; width:${size}px; height:${size}px;
+      background:${colors[i % colors.length]};
+      --tx:${Math.cos(angle) * dist}px; --ty:${Math.sin(angle) * dist}px;
+    `
+    container.appendChild(p)
+    p.addEventListener('animationend', () => p.remove())
+  }
+}
+
+/* ── Ripple Effect ── */
+function spawnRipple(e, element) {
+  const rect = element.getBoundingClientRect()
+  const ripple = document.createElement('div')
+  ripple.className = 'click-ripple'
+  ripple.style.left = (e.clientX - rect.left) + 'px'
+  ripple.style.top = (e.clientY - rect.top) + 'px'
+  element.appendChild(ripple)
+  ripple.addEventListener('animationend', () => ripple.remove())
+}
+
 const SCREENS = { INPUT: 'input', LOADING: 'loading', RESULTS: 'results' }
 
 export default function App() {
@@ -78,21 +108,34 @@ export default function App() {
   const [showDB,     setShowDB]   = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
   const [meta,       setMeta]     = useState({})
+  const [transitioning, setTransitioning] = useState(false)
+  const [transitionType, setTransitionType] = useState('')
 
   // Nav stats
   const totalPipeline = leads.reduce((s, l) => s + l.annual, 0)
   const avgScore      = leads.length ? Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length) : 0
   const hotCount      = leads.filter(l => l.score >= 85).length
 
-  // Canvas ref
+  // Refs
   const canvasRef = useRef(null)
+  const appRef = useRef(null)
 
-  // Animated background canvas
+  // ── Screen transition wrapper ──
+  const transitionTo = useCallback((newScreen, type = 'wipe') => {
+    setTransitionType(type)
+    setTransitioning(true)
+    setTimeout(() => {
+      setScreen(newScreen)
+      setTimeout(() => setTransitioning(false), 50)
+    }, 500)
+  }, [])
+
+  // Animated background canvas with floating bubbles
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx  = canvas.getContext('2d')
-    let W, H, nodes = [], animId
+    let W, H, nodes = [], bubbles = [], animId
 
     const resize = () => {
       W = canvas.width  = window.innerWidth
@@ -104,10 +147,54 @@ export default function App() {
         r:  Math.random() * 2 + 0.5,
         phase: Math.random() * Math.PI * 2
       }))
+      // Floating bubbles
+      bubbles = Array.from({ length: 18 }, () => ({
+        x: Math.random() * W,
+        y: H + Math.random() * 200,
+        r: 4 + Math.random() * 12,
+        speed: 0.3 + Math.random() * 0.6,
+        wobble: Math.random() * Math.PI * 2,
+        wobbleSpeed: 0.01 + Math.random() * 0.02,
+        color: Math.floor(Math.random() * 4)
+      }))
     }
 
     const tick = (t) => {
       ctx.clearRect(0, 0, W, H)
+
+      // Draw floating bubbles
+      const bubbleColors = ['0,255,255', '124,58,237', '255,0,110', '5,255,161']
+      bubbles.forEach(b => {
+        b.y -= b.speed
+        b.wobble += b.wobbleSpeed
+        const wx = b.x + Math.sin(b.wobble) * 20
+        if (b.y < -b.r * 2) { b.y = H + b.r * 2; b.x = Math.random() * W }
+
+        const c = bubbleColors[b.color]
+        // Outer glow
+        const grad = ctx.createRadialGradient(wx, b.y, 0, wx, b.y, b.r * 2)
+        grad.addColorStop(0, `rgba(${c},0.08)`)
+        grad.addColorStop(1, `rgba(${c},0)`)
+        ctx.beginPath()
+        ctx.arc(wx, b.y, b.r * 2, 0, Math.PI * 2)
+        ctx.fillStyle = grad
+        ctx.fill()
+
+        // Bubble ring
+        ctx.beginPath()
+        ctx.arc(wx, b.y, b.r, 0, Math.PI * 2)
+        ctx.strokeStyle = `rgba(${c},${0.15 + 0.1 * Math.sin(t * 0.002 + b.wobble)})`
+        ctx.lineWidth = 1
+        ctx.stroke()
+
+        // Inner highlight
+        ctx.beginPath()
+        ctx.arc(wx - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.25, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(255,255,255,${0.1 + 0.05 * Math.sin(t * 0.003)})`
+        ctx.fill()
+      })
+
+      // Draw network nodes
       nodes.forEach(n => {
         n.x += n.vx; n.y += n.vy
         if (n.x < 0 || n.x > W) n.vx *= -1
@@ -138,7 +225,6 @@ export default function App() {
         const c = colors[i % colors.length]
         ctx.fillStyle = `rgba(${c},${0.25 + 0.35 * p})`
         ctx.fill()
-        // glow effect on larger nodes
         if (n.r > 1.5) {
           ctx.beginPath()
           ctx.arc(n.x, n.y, n.r * 3, 0, Math.PI * 2)
@@ -159,12 +245,17 @@ export default function App() {
   }, [])
 
   // ── GENERATE LEADS ────────────────────────────────────────────────
-  const handleGenerate = async () => {
+  const handleGenerate = async (e) => {
     if (!bizType || !target || !service) {
       alert('Please fill in Business Type, Target Customer, and Service Offered.')
       return
     }
-    setScreen(SCREENS.LOADING)
+    // Particle burst on button click
+    if (appRef.current) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      spawnBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, appRef.current)
+    }
+    transitionTo(SCREENS.LOADING, 'wipe')
 
     try {
       const res = await fetch('/api/generate', {
@@ -188,7 +279,7 @@ export default function App() {
     setFiltered(newLeads)
     setMeta(newMeta)
     setActiveFilter('all')
-    setScreen(SCREENS.RESULTS)
+    transitionTo(SCREENS.RESULTS, 'bubble')
   }
 
   // ── FILTER & SORT ─────────────────────────────────────────────────
@@ -208,7 +299,12 @@ export default function App() {
   }
 
   // ── SAVE TO DB ────────────────────────────────────────────────────
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    if (appRef.current) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      spawnBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, appRef.current)
+    }
+
     const newSaved = leads.filter(l => !saved.find(s => s.name === l.name))
     setSaved(prev => [...prev, ...newSaved.map(l => ({ ...l, savedAt: new Date().toLocaleTimeString() }))])
 
@@ -237,7 +333,7 @@ export default function App() {
 
   // ── RESET ─────────────────────────────────────────────────────────
   const handleReset = () => {
-    setScreen(SCREENS.INPUT)
+    transitionTo(SCREENS.INPUT, 'bubble')
     setLeads([])
     setFiltered([])
     setShowDB(false)
@@ -245,12 +341,30 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" ref={appRef}>
       {/* Animated background */}
       <canvas ref={canvasRef} style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:0, opacity:0.6 }} />
       <div className="orb orb1" />
       <div className="orb orb2" />
       <div className="orb orb3" />
+
+      {/* Screen transition overlay */}
+      {transitioning && (
+        <div className={`screen-transition ${transitionType}`}>
+          {transitionType === 'bubble' && (
+            <>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="transition-bubble" style={{
+                  left: `${10 + (i % 4) * 25}%`,
+                  top: `${10 + Math.floor(i / 4) * 30}%`,
+                  animationDelay: `${i * 0.04}s`,
+                  '--size': `${80 + Math.random() * 120}vmax`
+                }} />
+              ))}
+            </>
+          )}
+        </div>
+      )}
 
       <div className="app-content">
         <Navbar
@@ -321,7 +435,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  <button className="forge-btn" onClick={handleGenerate}>
+                  <button className="forge-btn ripple-btn" onClick={handleGenerate} onMouseDown={e => spawnRipple(e, e.currentTarget)}>
                     <IconSearch />
                     Discover Leads
                   </button>
