@@ -1,0 +1,59 @@
+.lead-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid; grid-template-columns: 56px 1fr 88px;
+  gap: 1.25rem; align-items: start; cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s;
+  animation: cardIn 0.4s ease both;
+  overflow: hidden;
+}
+.lead-card:hover    { border-color: var(--border2); transform: translateX(3px); }
+.lead-card.expanded { border-color: var(--accent); background: var(--surface2); transform: none; }
+
+.lead-rank { display: flex; align-items: center; justify-content: center; padding: 1.5rem 0 1.5rem 1.25rem; }
+.rank-num  { font-family: var(--font-display); font-size: 2.2rem; color: var(--border3); line-height: 1; letter-spacing: -0.04em; }
+.rank-num.is-top { color: var(--gold); }
+
+.lead-body  { padding: 1.25rem 0; }
+.lead-name  { font-family: var(--font-display); font-size: 1.25rem; letter-spacing: -0.01em; color: var(--text); margin-bottom: 2px; }
+.lead-sub   { font-family: var(--font-mono); font-size: 10px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+
+.lead-tags  { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.ltag { font-size: 11px; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border2); color: var(--text2); }
+.ltag.t-industry { border-color: rgba(0,212,255,0.3);  color: var(--accent); background: rgba(0,212,255,0.05); }
+.ltag.t-location { border-color: rgba(16,185,129,0.3); color: var(--green);  background: rgba(16,185,129,0.05); }
+.ltag.t-size     { border-color: rgba(124,58,237,0.3); color: #a78bfa;       background: rgba(124,58,237,0.05); }
+.ltag.t-signal   { border-color: rgba(245,158,11,0.3); color: var(--gold);   background: rgba(245,158,11,0.05); }
+
+.lead-reason { font-size: 13px; color: var(--text2); line-height: 1.65; border-left: 2px solid var(--border2); padding-left: 12px; }
+
+/* EXPAND */
+.lead-expand { border-top: 1px solid var(--border); padding-top: 1.25rem; margin-top: 1rem; animation: fadeUp 0.25s ease both; }
+.expand-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+
+.ebox       { background: var(--surface3); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; }
+.ebox-label { font-family: var(--font-mono); font-size: 9px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+
+.deal-val        { font-family: var(--font-display); font-size: 1.6rem; color: var(--green); letter-spacing: -0.02em; }
+.deal-val span   { font-size: 0.85rem; color: var(--text3); font-family: var(--font-mono); }
+.deal-annual     { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+.outreach-list { display: flex; flex-direction: column; gap: 8px; }
+.ostep         { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--text2); line-height: 1.5; }
+.ostep-n       { width: 18px; height: 18px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 9px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+
+.signals-list { display: flex; flex-direction: column; gap: 6px; }
+.signal-row   { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+.signal-dot   { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+/* SCORE */
+.lead-score-col   { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 1.25rem 1.25rem 1.25rem 0; }
+.score-ring-wrap  { position: relative; width: 72px; height: 72px; }
+.score-num        { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+.score-badge-label{ font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+@media (max-width: 960px) {
+  .lead-card        { grid-template-columns: 44px 1fr; }
+  .lead-score-col   { display: none; }
+  .expand-grid      { grid-template-columns: 1fr; }
+}
