@@ -1,51 +1,17 @@
-/* ── NAVBAR : Holographic Floating Glass ── */
+/* ── NAVBAR : Clean Sticky Nav ── */
 
 .navbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 2rem;
-  background: var(--surface);
-  backdrop-filter: blur(32px) saturate(1.4);
-  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+  background: var(--bg2);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow:
-    0 4px 32px rgba(0, 0, 0, 0.28),
-    0 1px 0 rgba(138, 120, 255, 0.06),
-    inset 0 -1px 0 rgba(138, 120, 255, 0.04);
-  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition: box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* Iridescent bottom shimmer */
-.navbar::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(123, 140, 255, 0.18) 20%,
-    rgba(168, 85, 247, 0.14) 45%,
-    rgba(94, 234, 212, 0.12) 70%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: gradientFlow 6s ease infinite;
-  pointer-events: none;
-}
-
-.navbar:hover {
-  box-shadow:
-    0 6px 40px rgba(0, 0, 0, 0.32),
-    0 1px 0 rgba(138, 120, 255, 0.1),
-    inset 0 -1px 0 rgba(138, 120, 255, 0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  animation: fadeUp 0.3s var(--ease) both;
 }
 
 /* ── Logo ── */
@@ -58,21 +24,17 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.2s var(--ease);
 }
 .nav-logo:hover {
-  transform: scale(1.04);
+  opacity: 0.85;
 }
 
 .nav-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--purple));
-  box-shadow:
-    0 0 10px rgba(123, 140, 255, 0.5),
-    0 0 28px rgba(168, 85, 247, 0.25);
-  animation: dotPulse 2.5s ease-in-out infinite;
+  background: var(--accent);
 }
 
 /* ── Version Badge ── */
@@ -80,42 +42,16 @@
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
-  background: rgba(123, 140, 255, 0.05);
+  background: rgba(108,99,255,0.06);
   color: var(--accent);
-  border: 1px solid rgba(123, 140, 255, 0.15);
+  border: 1px solid var(--border2);
   border-radius: 20px;
   padding: 4px 14px;
-  animation: iridescent 6s ease-in-out infinite;
-  transition: all 0.45s cubic-bezier(0.22, 1, 0.36, 1);
-  position: relative;
-  overflow: hidden;
-}
-.nav-badge::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(168, 85, 247, 0.12),
-    transparent
-  );
-  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.nav-badge:hover::before {
-  left: 150%;
+  transition: all 0.2s var(--ease);
 }
 .nav-badge:hover {
-  box-shadow:
-    0 0 16px rgba(123, 140, 255, 0.15),
-    0 0 40px rgba(168, 85, 247, 0.06);
-  transform: scale(1.05);
-  border-color: rgba(168, 85, 247, 0.3);
-  background: rgba(123, 140, 255, 0.08);
-  color: var(--purple-light);
+  border-color: var(--border3);
+  background: rgba(108,99,255,0.08);
 }
 
 /* ── Right Section ── */
@@ -128,22 +64,16 @@
 .nav-divider {
   width: 1px;
   height: 28px;
-  background: linear-gradient(
-    180deg,
-    transparent,
-    rgba(168, 85, 247, 0.2),
-    rgba(94, 234, 212, 0.1),
-    transparent
-  );
+  background: var(--border2);
 }
 
 /* ── Stats ── */
 .nav-stat {
   text-align: right;
-  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.2s var(--ease);
 }
 .nav-stat:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .nav-stat-num {
@@ -153,13 +83,9 @@
   color: var(--accent);
   letter-spacing: -0.01em;
   line-height: 1;
-  text-shadow: 0 0 10px rgba(123, 140, 255, 0.3);
-  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color 0.2s var(--ease);
 }
 .nav-stat:hover .nav-stat-num {
-  text-shadow:
-    0 0 18px rgba(123, 140, 255, 0.45),
-    0 0 40px rgba(168, 85, 247, 0.12);
   color: var(--purple-light);
 }
 
@@ -169,7 +95,7 @@
   color: var(--text3);
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  transition: color 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color 0.2s var(--ease);
 }
 .nav-stat:hover .nav-stat-label {
   color: var(--text2);

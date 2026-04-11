@@ -63,30 +63,38 @@ export default function LeadCard({ lead, rank, animDelay }) {
       {/* BODY */}
       <div className="lead-body">
         <div className="lead-name">
-          <a
-            className="lead-name-link"
-            href={`https://www.google.com/maps/search/${encodeURIComponent(lead.name + ' ' + lead.city)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-          >
-            {lead.name}
-            <span className="lead-map-icon"><IconPin /></span>
-          </a>
+          {lead.address ? (
+            <a
+              className="lead-name-link"
+              href={`https://www.google.com/maps/search/${encodeURIComponent(lead.address || lead.name + ' ' + lead.city)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+            >
+              {lead.name}
+              <span className="lead-map-icon"><IconPin /></span>
+            </a>
+          ) : (
+            lead.name
+          )}
         </div>
         <div className="lead-sub">{lead.decisionMaker} · {lead.size}</div>
 
         <div className="lead-tags">
           <span className="ltag t-industry">{lead.industry}</span>
-          <a
-            className="ltag t-location ltag-map"
-            href={`https://www.google.com/maps/search/${encodeURIComponent(lead.city)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={e => e.stopPropagation()}
-          >
-            <IconPin /> {lead.city}
-          </a>
+          {lead.address ? (
+            <a
+              className="ltag t-location ltag-map"
+              href={`https://www.google.com/maps/search/${encodeURIComponent(lead.address || lead.city)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+            >
+              <IconPin /> {lead.city}
+            </a>
+          ) : (
+            <span className="ltag t-location"><IconPin /> {lead.city}</span>
+          )}
           <span className="ltag t-size">{lead.size}</span>
           {lead.signals.slice(0, 2).map((s, i) => (
             <span key={i} className="ltag t-signal"><IconBolt /> {s}</span>
