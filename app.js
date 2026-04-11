@@ -1,7 +1,11 @@
 /**
  * SmartLead — app.js
- * Handles: lead generation via OpenRouter + Claude, geolocation,
+ * Handles: lead generation via Groq + Llama, geolocation,
  *          rendering, filtering, sorting, DB panel, CSV export, canvas
+ *
+ * VALIDATION SYSTEM — Two layers:
+ *   Layer 1: Instant JS checks (no API call)
+ *   Layer 2: AI pre-validation via Groq (before lead gen)
  */
 
 'use strict';
@@ -15,6 +19,258 @@ const CONFIG = {
   OR_URL:            'https://api.groq.com/openai/v1/chat/completions',
   OR_MODEL:          'llama-3.3-70b-versatile'
 };
+
+// ── LAYER 1: INSTANT JS VALIDATION ────────────────────────────────────
+const Validator = {
+
+  // Characters that are only noise
+  NOISE_PATTERN:    /^[^a-zA-Z]*$/,
+
+  // All same character repeated: aaaa, 1111, ....
+  REPEAT_PATTERN:   /^(.)\1+$/,
+
+  // Keyboard mash patterns: asdf, qwer, zxcv, etc.
+  KEYBOARD_ROWS: [
+    'qwertyuiop', 'asdfghjkl', 'zxcvbnm',
+    'qwerty', 'asdfgh', 'zxcvbn', 'qweasd', 'poiuyt'
+  ],
+
+  // Words that have nothing to do with business context
+  NONSENSE_WORDS: [
+    'asdf','qwerty','zxcv','hjkl','aaaa','bbbb','cccc','dddd',
+    'test','testing','blah','blahblah','foo','bar','baz','foobar',
+    'lorem','ipsum','stuff','things','idk','dunno','whatever',
+    'nothing','none','na','n/a','lol','lmao','haha','hehe',
+    'aaa','bbb','ccc','ddd','eee','fff','ggg','hhh','iii','jjj',
+    'kkk','lll','mmm','nnn','ooo','ppp','qqq','rrr','sss','ttt',
+    'uuu','vvv','www','xxx','yyy','zzz',
+    'abc','abcd','abcde','abcdef','abcdefg',
+    '123','1234','12345','123456',
+    'random','fake','test123','hello','hi','hey','yo','sup',
+    'cheese','pizza','burger','cat','dog','fish','bird',
+    'ilikecheese','ihatemondays','idontknow'
+  ],
+
+  // Minimum thresholds
+  MIN_LENGTH: 3,
+  MAX_LENGTH: 120,
+
+  /**
+   * Run all Layer 1 checks on a single field value.
+   * Returns { valid: boolean, reason: string }
+   */
+  checkField(value, fieldName) {
+    const v = value.trim();
+
+    // 1. Empty
+    if (!v) return { valid: false, reason: `${fieldName} cannot be empty.` };
+
+    // 2. Too short
+    if (v.length < this.MIN_LENGTH)
+      return { valid: false, reason: `${fieldName} is too short to be valid.` };
+
+    // 3. Too long (spam)
+    if (v.length > this.MAX_LENGTH)
+      return { valid: false, reason: `${fieldName} is too long. Keep it concise.` };
+
+    // 4. No letters at all
+    if (this.NOISE_PATTERN.test(v))
+      return { valid: false, reason: `${fieldName} must contain real words.` };
+
+    // 5. All same character
+    if (this.REPEAT_PATTERN.test(v.replace(/\s/g, '')))
+      return { valid: false, reason: `${fieldName} doesn't look like a real entry.` };
+
+    // 6. Keyboard row mash
+    const lower = v.toLowerCase().replace(/\s/g, '');
+    for (const row of this.KEYBOARD_ROWS) {
+      if (lower.length >= 4 && row.includes(lower))
+        return { valid: false, reason: `${fieldName} looks like keyboard mashing.` };
+    }
+
+    // 7. Known nonsense words (exact or contained)
+    for (const word of this.NONSENSE_WORDS) {
+      if (lower === word || lower.replace(/\s/g,'') === word)
+        return { valid: false, reason: `"${v}" is not a valid ${fieldName.toLowerCase()}.` };
+    }
+
+    // 8. Too many repeated characters (e.g. "aaabbbccc")
+    const charCounts = {};
+    for (const c of lower.replace(/\s/g,'')) charCounts[c] = (charCounts[c] || 0) + 1;
+    const maxRepeat  = Math.max(...Object.values(charCounts));
+    const totalChars = lower.replace(/\s/g,'').length;
+    if (totalChars > 4 && maxRepeat / totalChars > 0.6)
+      return { valid: false, reason: `${fieldName} doesn't appear to be a real entry.` };
+
+    // 9. Only numbers
+    if (/^\d+$/.test(v))
+      return { valid: false, reason: `${fieldName} must be a real description, not just numbers.` };
+
+    // 10. Suspiciously random character sequence (no vowels in long string)
+    if (lower.replace(/\s/g,'').length > 5) {
+      const vowels = (lower.match(/[aeiou]/g) || []).length;
+      if (vowels === 0)
+        return { valid: false, reason: `${fieldName} doesn't look like real text.` };
+    }
+
+    return { valid: true, reason: '' };
+  },
+
+  /**
+   * Run Layer 1 on all three required fields.
+   * Returns first failure or { valid: true }
+   */
+  runLayer1(biz, target, service) {
+    const checks = [
+      this.checkField(biz,     'Business Type'),
+      this.checkField(target,  'Target Customer'),
+      this.checkField(service, 'Service Offered')
+    ];
+    for (const check of checks) {
+      if (!check.valid) return check;
+    }
+    return { valid: true, reason: '' };
+  }
+};
+
+// ── LAYER 2: AI PRE-VALIDATION ─────────────────────────────────────────
+async function validateWithAI(biz, target, service) {
+  const prompt = `You are a strict business input validator. A user has entered the following into a B2B lead generation tool:
+
+Business Type: "${biz}"
+Target Customer: "${target}"
+Service Offered: "${service}"
+
+Your job is to determine if ALL THREE fields are:
+1. Real, coherent business-related entries (not gibberish, nonsense, random words, or keyboard mashing)
+2. Internally consistent with each other (e.g. a "bakery" targeting "software engineers" with "cloud hosting" is inconsistent)
+3. Specific enough to generate meaningful B2B leads (not just "stuff" or "services" or "things")
+
+You must respond with ONLY a raw JSON object — no markdown, no explanation, no code fences:
+{"valid": true} if all fields pass, or
+{"valid": false, "reason": "One clear sentence explaining what is wrong"}
+
+Be strict. Reject nonsense, gibberish, joke inputs, and incoherent combinations. Accept legitimate businesses even if niche or unusual.`;
+
+  const res = await fetch(CONFIG.OR_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${CONFIG.OR_KEY}`,
+      'HTTP-Referer':  window.location.href,
+      'X-Title':       'SmartLead-Validator'
+    },
+    body: JSON.stringify({
+      model:       CONFIG.OR_MODEL,
+      max_tokens:  80,
+      temperature: 0,
+      messages:    [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!res.ok) {
+    // If the validation call itself fails, don't block the user —
+    // fall back to Layer 1 result (already passed at this point)
+    console.warn('[Validator] AI validation call failed, skipping Layer 2.');
+    return { valid: true };
+  }
+
+  const data = await res.json();
+  const raw  = data?.choices?.[0]?.message?.content || '{}';
+
+  try {
+    const clean  = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+    return {
+      valid:  parsed.valid === true,
+      reason: parsed.reason || 'Your inputs don\'t appear to be valid business information.'
+    };
+  } catch {
+    // Unparseable response — don't block
+    return { valid: true };
+  }
+}
+
+// ── ERROR DISPLAY ──────────────────────────────────────────────────────
+function showValidationError(message) {
+  // Remove any existing error
+  const existing = document.getElementById('validation-error');
+  if (existing) existing.remove();
+
+  const el       = document.createElement('div');
+  el.id          = 'validation-error';
+  el.style.cssText = `
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 8px;
+    color: #f87171;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 12px 16px;
+    margin: 0 20px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: errorIn 0.25s ease both;
+  `;
+
+  el.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <span>${message}</span>
+  `;
+
+  // Insert before the forge button
+  const btn = document.getElementById('forge-btn');
+  btn.parentNode.insertBefore(el, btn);
+
+  // Shake the form card
+  const card = document.querySelector('.form-card');
+  card.style.animation = 'none';
+  card.offsetHeight; // reflow
+  card.style.animation = 'shake 0.4s ease';
+
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    if (document.getElementById('validation-error')) {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.3s ease';
+      setTimeout(() => el.remove(), 300);
+    }
+  }, 5000);
+}
+
+function clearValidationError() {
+  const existing = document.getElementById('validation-error');
+  if (existing) existing.remove();
+}
+
+// Inject shake keyframe if not already present
+(function injectStyles() {
+  if (document.getElementById('smartlead-extra-styles')) return;
+  const style       = document.createElement('style');
+  style.id          = 'smartlead-extra-styles';
+  style.textContent = `
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      15%      { transform: translateX(-6px); }
+      30%      { transform: translateX(6px); }
+      45%      { transform: translateX(-4px); }
+      60%      { transform: translateX(4px); }
+      75%      { transform: translateX(-2px); }
+      90%      { transform: translateX(2px); }
+    }
+    @keyframes errorIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #validation-error { transition: opacity 0.3s ease; }
+  `;
+  document.head.appendChild(style);
+})();
 
 // ── GEOLOCATION via ipapi.co ────────────────────────────────────────────
 const GeoLocation = {
@@ -50,7 +306,7 @@ const GeoLocation = {
   }
 };
 
-// ── LEAD GENERATION via OpenRouter + Claude ─────────────────────────────
+// ── LEAD GENERATION via Groq ────────────────────────────────────────────
 async function generateLeads(biz, target, service, location, dealSize) {
   const geoLabel   = location || GeoLocation.label() || 'Not specified';
   const geoContext = GeoLocation.data
@@ -170,11 +426,12 @@ function showScreen(id) {
 
 // ── LOADING SEQUENCE ───────────────────────────────────────────────────
 const LOG_STEPS = [
-  { sub: 'Detecting your location...',            pct: 12 },
-  { sub: 'Analysing your business profile...',    pct: 28 },
-  { sub: 'Cross-referencing local companies...',  pct: 48 },
-  { sub: 'Running AI qualification engine...',    pct: 70 },
-  { sub: 'Generating personalised strategies...', pct: 88 }
+  { sub: 'Validating your business profile...',   pct: 10 },
+  { sub: 'Detecting your location...',            pct: 25 },
+  { sub: 'Analysing your business profile...',    pct: 42 },
+  { sub: 'Cross-referencing local companies...',  pct: 60 },
+  { sub: 'Running AI qualification engine...',    pct: 78 },
+  { sub: 'Generating personalised strategies...', pct: 92 }
 ];
 
 function startLoading() {
@@ -367,11 +624,17 @@ const SmartLead = {
     const location = document.getElementById('location').value.trim();
     const dealSize = document.getElementById('deal-size').value;
 
-    if (!biz || !target || !service) {
-      alert('Please fill in Business Type, Target Customer, and Service Offered.');
+    // ── LAYER 1: Instant JS validation ──────────────────────────────
+    const layer1 = Validator.runLayer1(biz, target, service);
+    if (!layer1.valid) {
+      showValidationError(layer1.reason);
       return;
     }
 
+    // Clear any previous error
+    clearValidationError();
+
+    // Disable button, go to loading screen
     document.getElementById('forge-btn').disabled = true;
     showScreen('loading-screen');
     startLoading();
@@ -379,12 +642,28 @@ const SmartLead = {
     const meta = { biz, target, service, location, dealSize };
 
     try {
-      // Silently detect location if not manually provided and not already cached
+      // ── LAYER 2: AI validation (runs in parallel with geo + min delay) ──
       if (!location && !GeoLocation.data) {
         await GeoLocation.detect();
       }
 
-      // Run API call and minimum loading animation in parallel
+      const [aiCheck] = await Promise.all([
+        validateWithAI(biz, target, service),
+        new Promise(resolve => setTimeout(resolve, 800)) // min time on step 0
+      ]);
+
+      if (!aiCheck.valid) {
+        // Failed AI validation — go back, show error
+        stopLoading();
+        setTimeout(() => {
+          document.getElementById('forge-btn').disabled = false;
+          showScreen('input-screen');
+          showValidationError(aiCheck.reason);
+        }, 300);
+        return;
+      }
+
+      // ── Both layers passed — generate leads ──────────────────────
       const [leads] = await Promise.all([
         generateLeads(biz, target, service, location, dealSize),
         new Promise(resolve => setTimeout(resolve, CONFIG.SIMULATE_DELAY_MS))
@@ -401,9 +680,11 @@ const SmartLead = {
     } catch (err) {
       stopLoading();
       console.error('SmartLead error:', err);
-      alert(`Lead generation failed: ${err.message}\n\nCheck your connection and try again.`);
-      document.getElementById('forge-btn').disabled = false;
-      showScreen('input-screen');
+      setTimeout(() => {
+        document.getElementById('forge-btn').disabled = false;
+        showScreen('input-screen');
+        showValidationError(`Something went wrong: ${err.message}. Please try again.`);
+      }, 300);
     }
   },
 
@@ -419,6 +700,7 @@ const SmartLead = {
     document.getElementById('service').value   = s.service;
     document.getElementById('location').value  = s.location;
     document.getElementById('deal-size').value = s.deal;
+    clearValidationError();
   },
 
   toggleExpand(index, card) {
@@ -511,6 +793,7 @@ const SmartLead = {
     document.getElementById('nav-leads-found').textContent    = '0';
     document.getElementById('nav-total-pipeline').textContent = '$0';
     document.getElementById('db-panel').style.display         = 'none';
+    clearValidationError();
     showScreen('input-screen');
   }
 };
@@ -518,6 +801,12 @@ const SmartLead = {
 // ── PREFETCH LOCATION SILENTLY ON PAGE LOAD ────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   GeoLocation.detect();
+
+  // Clear error when user starts typing in any field
+  ['biz-type', 'target', 'service', 'location'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', clearValidationError);
+  });
 });
 
 // ── ANIMATED CANVAS BACKGROUND ─────────────────────────────────────────
