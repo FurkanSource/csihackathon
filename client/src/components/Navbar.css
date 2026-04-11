@@ -1,37 +1,44 @@
 .navbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0.875rem 2rem;
-  border-bottom: 1px solid var(--border);
-  background: rgba(7,9,15,0.85);
+  border-bottom: 1px solid rgba(0,255,255,0.08);
+  background: rgba(7,8,14,0.8);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.3), 0 1px 0 rgba(0,255,255,0.05);
 }
 
 .nav-logo {
   font-family: var(--font-display); font-size: 1.4rem; font-weight: 700;
-  letter-spacing: 0.04em; color: var(--text);
+  letter-spacing: 0.02em; color: var(--text);
   display: flex; align-items: center; gap: 10px;
 }
 
 .nav-dot {
   width: 9px; height: 9px; border-radius: 50%;
   background: var(--accent);
-  box-shadow: 0 0 12px var(--accent), 0 0 24px rgba(0,212,255,0.4);
+  box-shadow: 0 0 12px var(--accent), 0 0 30px rgba(0,255,255,0.5);
   animation: dotPulse 2s ease-in-out infinite;
 }
 
 .nav-badge {
   font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em;
-  background: var(--accent-dim); color: var(--accent);
-  border: 1px solid rgba(0,212,255,0.2); border-radius: 20px;
+  background: rgba(0,255,255,0.06); color: var(--accent);
+  border: 1px solid rgba(0,255,255,0.2); border-radius: 20px;
   padding: 4px 14px;
+  text-shadow: 0 0 8px rgba(0,255,255,0.3);
+  animation: neonPulse 3s ease-in-out infinite;
 }
 
 .nav-right { display: flex; align-items: center; gap: 1.5rem; }
-.nav-divider { width: 1px; height: 28px; background: var(--border2); }
+.nav-divider { width: 1px; height: 28px; background: linear-gradient(180deg, transparent, rgba(0,255,255,0.2), transparent); }
 .nav-stat { text-align: right; }
-.nav-stat-num { font-family: var(--font-display); font-size: 1.15rem; color: var(--accent); letter-spacing: -0.01em; line-height: 1; }
+.nav-stat-num {
+  font-family: var(--font-display); font-size: 1.15rem; font-weight: 600;
+  color: var(--accent); letter-spacing: -0.01em; line-height: 1;
+  text-shadow: 0 0 10px rgba(0,255,255,0.4);
+}
 .nav-stat-label { font-family: var(--font-mono); font-size: 9px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; }
 
 @media (max-width: 600px) {

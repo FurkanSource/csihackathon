@@ -72,17 +72,21 @@ export default function App() {
             ctx.beginPath()
             ctx.moveTo(nodes[i].x, nodes[i].y)
             ctx.lineTo(nodes[j].x, nodes[j].y)
-            ctx.strokeStyle = `rgba(0,212,255,${(1 - d / 130) * 0.1})`
+            const lineColors = ['0,255,255', '124,58,237', '255,0,110']
+            const lc = lineColors[(i + j) % lineColors.length]
+            ctx.strokeStyle = `rgba(${lc},${(1 - d / 130) * 0.12})`
             ctx.lineWidth = 0.5
             ctx.stroke()
           }
         }
       }
-      nodes.forEach(n => {
+      nodes.forEach((n, i) => {
         const p = 0.5 + 0.5 * Math.sin(t * 0.001 + n.x)
         ctx.beginPath()
         ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(0,212,255,${0.15 + 0.25 * p})`
+        const colors = ['0,255,255', '124,58,237', '255,0,110', '5,255,161']
+        const c = colors[i % colors.length]
+        ctx.fillStyle = `rgba(${c},${0.2 + 0.35 * p})`
         ctx.fill()
       })
       animId = requestAnimationFrame(tick)
@@ -192,6 +196,7 @@ export default function App() {
       <canvas ref={canvasRef} style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:0, opacity:0.5 }} />
       <div className="orb orb1" />
       <div className="orb orb2" />
+      <div className="orb orb3" />
 
       <div className="app-content">
         <Navbar
