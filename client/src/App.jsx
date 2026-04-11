@@ -7,6 +7,7 @@ import LeadCard      from './components/LeadCard'
 import SummaryCard   from './components/SummaryCard'
 import FilterBar     from './components/FilterBar'
 import ResultsHeader from './components/ResultsHeader'
+import ChatBot       from './components/ChatBot'
 
 import { generateMockLeads, SAMPLES } from './data/sampleData'
 import { formatMoney, formatDate, exportCSV } from './utils/formatters'
@@ -526,6 +527,9 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {/* ChatBot Widget */}
+      <ChatBot />
     </div>
   )
 }
