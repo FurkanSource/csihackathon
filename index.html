@@ -7,6 +7,37 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cabinet+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css"/>
+  <style>
+    /* ── RADIUS SLIDER ── */
+    .radius-wrap {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .radius-slider {
+      flex: 1; -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 2px; outline: none;
+      background: linear-gradient(to right, var(--accent) 0%, var(--accent) 25%, var(--border2) 25%, var(--border2) 100%);
+      cursor: pointer;
+    }
+    .radius-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px rgba(0,212,255,0.5);
+      cursor: pointer; transition: box-shadow 0.18s;
+    }
+    .radius-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 14px rgba(0,212,255,0.7);
+    }
+    .radius-slider::-moz-range-thumb {
+      width: 16px; height: 16px; border-radius: 50%; border: none;
+      background: var(--accent); box-shadow: 0 0 8px rgba(0,212,255,0.5);
+      cursor: pointer;
+    }
+    .radius-val {
+      font-family: var(--font-mono); font-size: 12px; color: var(--accent);
+      min-width: 52px; text-align: right; letter-spacing: 0.05em;
+    }
+  </style>
 </head>
 <body>
 
@@ -80,9 +111,10 @@
             <label>Service Offered</label>
             <input type="text" id="service" placeholder="e.g. Social media management & paid ads"/>
           </div>
+
           <div class="field-row">
             <div class="field">
-              <label>Location (optional)</label>
+              <label>Location <span style="color:var(--text3);font-size:9px">(required for radius)</span></label>
               <input type="text" id="location" placeholder="e.g. Miami, FL"/>
             </div>
             <div class="field">
@@ -93,6 +125,16 @@
                 <option value="large">$10K–$50K/mo</option>
                 <option value="enterprise">$50K+/mo</option>
               </select>
+            </div>
+          </div>
+
+          <!-- RADIUS SLIDER -->
+          <div class="field">
+            <label>Search Radius</label>
+            <div class="radius-wrap">
+              <input type="range" id="radius" class="radius-slider"
+                     min="5" max="100" value="25" step="5"/>
+              <span class="radius-val" id="radius-val">25 mi</span>
             </div>
           </div>
 
@@ -127,11 +169,12 @@
       <p class="loading-sub" id="loading-sub">Initializing lead discovery engine</p>
       <div class="progress-wrap"><div class="progress-fill" id="progress-fill"></div></div>
       <div class="log-list" id="log-list">
-        <div class="log-item" id="log-0"><span class="log-dot"></span>Analyzing business profile</div>
-        <div class="log-item" id="log-1"><span class="log-dot"></span>Cross-referencing 50,000+ companies</div>
-        <div class="log-item" id="log-2"><span class="log-dot"></span>Running qualification algorithms</div>
-        <div class="log-item" id="log-3"><span class="log-dot"></span>Generating outreach strategies</div>
-        <div class="log-item" id="log-4"><span class="log-dot"></span>Calculating deal valuations</div>
+        <div class="log-item" id="log-0"><span class="log-dot"></span>Validating business profile</div>
+        <div class="log-item" id="log-1"><span class="log-dot"></span>Analyzing location & radius</div>
+        <div class="log-item" id="log-2"><span class="log-dot"></span>Scanning local businesses</div>
+        <div class="log-item" id="log-3"><span class="log-dot"></span>Running qualification engine</div>
+        <div class="log-item" id="log-4"><span class="log-dot"></span>Generating outreach strategies</div>
+        <div class="log-item" id="log-5"><span class="log-dot"></span>Calculating deal valuations</div>
       </div>
     </div>
   </section>
@@ -158,16 +201,14 @@
       </div>
     </div>
 
-    <!-- SUMMARY CARDS -->
     <div class="summary-grid" id="summary-grid"></div>
 
-    <!-- FILTER BAR -->
     <div class="filter-bar">
       <span class="filter-label">Filter by score:</span>
-      <button class="filter-btn active" data-filter="all" onclick="SmartLead.filter('all',this)">All</button>
-      <button class="filter-btn" data-filter="hot" onclick="SmartLead.filter('hot',this)">🔥 Hot (85+)</button>
-      <button class="filter-btn" data-filter="strong" onclick="SmartLead.filter('strong',this)">💎 Strong (70+)</button>
-      <button class="filter-btn" data-filter="warm" onclick="SmartLead.filter('warm',this)">⚡ Warm (55+)</button>
+      <button class="filter-btn active" onclick="SmartLead.filter('all',this)">All</button>
+      <button class="filter-btn" onclick="SmartLead.filter('hot',this)">🔥 Hot (85+)</button>
+      <button class="filter-btn" onclick="SmartLead.filter('strong',this)">💎 Strong (70+)</button>
+      <button class="filter-btn" onclick="SmartLead.filter('warm',this)">⚡ Warm (55+)</button>
       <div class="filter-right">
         <span class="filter-label">Sort:</span>
         <select class="filter-select" onchange="SmartLead.sort(this.value)">
@@ -178,10 +219,8 @@
       </div>
     </div>
 
-    <!-- LEAD CARDS -->
     <div class="leads-grid" id="leads-grid"></div>
 
-    <!-- DB PANEL -->
     <div class="db-panel" id="db-panel" style="display:none">
       <div class="db-panel-header">
         <div class="db-title">
@@ -200,7 +239,7 @@
 
   </section>
 
-</div><!-- /app -->
+</div>
 
 <script src="app.js"></script>
 </body>
