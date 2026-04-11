@@ -83,7 +83,7 @@ function validateField(value, fieldName) {
 
 /* ── Particle Burst Effect ── */
 function spawnBurst(x, y, container) {
-  const colors = ['#00FFFF', '#7C3AED', '#FF006E', '#05FFA1', '#FFD700']
+  const colors = ['#6C63FF', '#8B5CF6', '#E879A8', '#4ADE80', '#FACC15']
   for (let i = 0; i < 24; i++) {
     const p = document.createElement('div')
     p.className = 'particle-burst'
@@ -187,7 +187,7 @@ export default function App() {
       ctx.clearRect(0, 0, W, H)
 
       // Draw floating bubbles
-      const bubbleColors = ['0,255,255', '124,58,237', '255,0,110', '5,255,161']
+      const bubbleColors = ['108,99,255', '139,92,246', '232,121,168', '74,222,128']
       bubbles.forEach(b => {
         b.y -= b.speed
         b.wobble += b.wobbleSpeed
@@ -233,7 +233,7 @@ export default function App() {
             ctx.beginPath()
             ctx.moveTo(nodes[i].x, nodes[i].y)
             ctx.lineTo(nodes[j].x, nodes[j].y)
-            const lineColors = ['0,255,255', '124,58,237', '255,0,110', '5,255,161']
+            const lineColors = ['108,99,255', '139,92,246', '232,121,168', '74,222,128']
             const lc = lineColors[(i + j) % lineColors.length]
             ctx.strokeStyle = `rgba(${lc},${(1 - d / 150) * 0.15})`
             ctx.lineWidth = 0.6
@@ -245,7 +245,7 @@ export default function App() {
         const p = 0.5 + 0.5 * Math.sin(t * 0.0015 + n.phase)
         ctx.beginPath()
         ctx.arc(n.x, n.y, n.r * (0.8 + 0.4 * p), 0, Math.PI * 2)
-        const colors = ['0,255,255', '124,58,237', '255,0,110', '5,255,161']
+        const colors = ['108,99,255', '139,92,246', '232,121,168', '74,222,128']
         const c = colors[i % colors.length]
         ctx.fillStyle = `rgba(${c},${0.25 + 0.35 * p})`
         ctx.fill()
