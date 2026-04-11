@@ -40,6 +40,8 @@
   --radius-sm: 10px;
   --radius-xs: 6px;
 
+  --purple-light: #a78bfa;
+
   --glow-cyan:   0 0 15px rgba(0,255,255,0.3), 0 0 40px rgba(0,255,255,0.1);
   --glow-purple: 0 0 15px rgba(124,58,237,0.3), 0 0 40px rgba(124,58,237,0.1);
   --glow-pink:   0 0 15px rgba(255,0,110,0.3), 0 0 40px rgba(255,0,110,0.1);

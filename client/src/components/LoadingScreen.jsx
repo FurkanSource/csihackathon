@@ -9,6 +9,12 @@ const STEPS = [
   { sub: 'Calculating deal valuations...',          pct: 95 },
 ]
 
+const IconCheck = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+)
+
 export default function LoadingScreen() {
   const [step, setStep]   = useState(0)
   const [pct, setPct]     = useState(8)
@@ -26,14 +32,16 @@ export default function LoadingScreen() {
 
   return (
     <div className="loading-screen screen">
-      <div className="scan-wrap">
-        <div className="scan-ring r1" />
-        <div className="scan-ring r2" />
-        <div className="scan-ring r3" />
-        <div className="scan-core">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
+      <div className="loading-3d-container">
+        <div className="scan-wrap">
+          <div className="scan-ring r1" />
+          <div className="scan-ring r2" />
+          <div className="scan-ring r3" />
+          <div className="scan-core">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
         </div>
       </div>
 
@@ -50,8 +58,8 @@ export default function LoadingScreen() {
             key={i}
             className={`log-item ${i < step ? 'done' : i === step ? 'active' : ''}`}
           >
-            <span className="log-dot" />
-            {i < step ? '✓ ' : ''}{s.sub.replace('...', '')}
+            <span className="log-dot">{i < step && <IconCheck />}</span>
+            {s.sub.replace('...', '')}
           </div>
         ))}
       </div>

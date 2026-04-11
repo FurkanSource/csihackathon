@@ -13,6 +13,7 @@
   --accent:     #00FFFF;
   --accent-dim: rgba(0,255,255,0.08);
   --purple:     #7C3AED;
+  --purple-light: #a78bfa;
   --pink:       #FF006E;
   --green:      #05FFA1;
   --green-dim:  rgba(5,255,161,0.08);
@@ -48,6 +49,7 @@ body {
   font-family: var(--font-body);
   min-height: 100vh;
   overflow-x: hidden;
+  perspective: 1200px;
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -58,14 +60,42 @@ body {
 button { cursor: pointer; font-family: var(--font-body); }
 input, select, textarea { font-family: var(--font-body); }
 
+/* ── KEYFRAME ANIMATIONS ── */
+
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fadeUp3D {
+  from { opacity: 0; transform: perspective(800px) translateY(30px) rotateX(8deg) scale(0.95); }
+  to   { opacity: 1; transform: perspective(800px) translateY(0) rotateX(0deg) scale(1); }
 }
 
 @keyframes cardIn {
-  from { opacity: 0; transform: translateX(-12px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: perspective(600px) translateX(-20px) rotateY(5deg); }
+  to   { opacity: 1; transform: perspective(600px) translateX(0) rotateY(0deg); }
+}
+
+@keyframes cardIn3D {
+  from { opacity: 0; transform: perspective(800px) translateZ(-60px) rotateX(5deg) translateY(15px); }
+  to   { opacity: 1; transform: perspective(800px) translateZ(0) rotateX(0) translateY(0); }
+}
+
+@keyframes slideInLeft3D {
+  from { opacity: 0; transform: perspective(800px) translateX(-80px) rotateY(15deg); }
+  to   { opacity: 1; transform: perspective(800px) translateX(0) rotateY(0); }
+}
+
+@keyframes slideInRight3D {
+  from { opacity: 0; transform: perspective(800px) translateX(80px) rotateY(-15deg); }
+  to   { opacity: 1; transform: perspective(800px) translateX(0) rotateY(0); }
+}
+
+@keyframes popIn3D {
+  0%  { opacity: 0; transform: perspective(600px) scale(0.6) rotateX(20deg) translateZ(-100px); }
+  70% { transform: perspective(600px) scale(1.03) rotateX(-2deg) translateZ(10px); }
+  100%{ opacity: 1; transform: perspective(600px) scale(1) rotateX(0) translateZ(0); }
 }
 
 @keyframes spinRing { to { transform: rotate(360deg); } }
@@ -77,9 +107,10 @@ input, select, textarea { font-family: var(--font-body); }
 }
 
 @keyframes borderGlow {
-  0%   { border-color: rgba(0,255,255,0.15); }
-  50%  { border-color: rgba(124,58,237,0.25); }
-  100% { border-color: rgba(0,255,255,0.15); }
+  0%   { border-color: rgba(0,255,255,0.15); box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(0,255,255,0.03); }
+  33%  { border-color: rgba(255,0,110,0.15); box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(255,0,110,0.03); }
+  66%  { border-color: rgba(124,58,237,0.2); box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(124,58,237,0.03); }
+  100% { border-color: rgba(0,255,255,0.15); box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(0,255,255,0.03); }
 }
 
 @keyframes gradientShift {
@@ -89,13 +120,43 @@ input, select, textarea { font-family: var(--font-body); }
 }
 
 @keyframes neonPulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.7; }
+  0%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(0,255,255,0.4); }
+  50%      { opacity: 0.75; text-shadow: 0 0 16px rgba(0,255,255,0.6); }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33%      { transform: translateY(-12px) rotate(1deg); }
+  66%      { transform: translateY(-6px) rotate(-1deg); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes rotateGradient {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes glitchFlicker {
+  0%, 100% { opacity: 1; }
+  92%      { opacity: 1; }
+  93%      { opacity: 0.8; transform: translateX(2px); }
+  94%      { opacity: 1; transform: translateX(0); }
+  96%      { opacity: 0.9; transform: translateX(-1px); }
+  97%      { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleBreath {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.02); }
+}
+
+@keyframes ring3D {
+  0%   { transform: rotateX(70deg) rotateZ(0deg); }
+  100% { transform: rotateX(70deg) rotateZ(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

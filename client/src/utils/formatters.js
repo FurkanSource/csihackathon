@@ -14,10 +14,10 @@ export function formatDate(d = new Date()) {
 }
 
 export function getScoreMeta(score) {
-  if (score >= 85) return { label: 'Hot Lead', stroke: '#10b981', color: '#10b981' }
-  if (score >= 70) return { label: 'Strong',   stroke: '#00d4ff', color: '#00d4ff' }
-  if (score >= 55) return { label: 'Warm',     stroke: '#f59e0b', color: '#f59e0b' }
-  return               { label: 'Cold',     stroke: '#ef4444', color: '#ef4444' }
+  if (score >= 85) return { label: 'Hot Lead', stroke: '#05FFA1', color: '#05FFA1' }
+  if (score >= 70) return { label: 'Strong',   stroke: '#00FFFF', color: '#00FFFF' }
+  if (score >= 55) return { label: 'Warm',     stroke: '#FFD700', color: '#FFD700' }
+  return               { label: 'Cold',     stroke: '#FF3B5C', color: '#FF3B5C' }
 }
 
 export function exportCSV(leads) {

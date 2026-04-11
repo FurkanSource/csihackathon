@@ -2,6 +2,38 @@ import React, { useState, useEffect, useRef } from 'react'
 import { getScoreMeta, formatMoney } from '../utils/formatters'
 import './LeadCard.css'
 
+/* ── Inline SVG Icons ── */
+const IconPin = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+  </svg>
+)
+const IconBolt = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+  </svg>
+)
+const IconDollar = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+  </svg>
+)
+const IconTarget = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+  </svg>
+)
+const IconTrend = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+  </svg>
+)
+const IconCheck = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+)
+
 export default function LeadCard({ lead, rank, animDelay }) {
   const [expanded, setExpanded] = useState(false)
   const meta     = getScoreMeta(lead.score)
@@ -35,10 +67,10 @@ export default function LeadCard({ lead, rank, animDelay }) {
 
         <div className="lead-tags">
           <span className="ltag t-industry">{lead.industry}</span>
-          <span className="ltag t-location">📍 {lead.city}</span>
+          <span className="ltag t-location"><IconPin /> {lead.city}</span>
           <span className="ltag t-size">{lead.size}</span>
           {lead.signals.slice(0, 2).map((s, i) => (
-            <span key={i} className="ltag t-signal">⚡ {s}</span>
+            <span key={i} className="ltag t-signal"><IconBolt /> {s}</span>
           ))}
         </div>
 
@@ -49,13 +81,13 @@ export default function LeadCard({ lead, rank, animDelay }) {
           <div className="lead-expand" onClick={e => e.stopPropagation()}>
             <div className="expand-grid">
               <div className="ebox">
-                <div className="ebox-label">💰 Deal Valuation</div>
+                <div className="ebox-label"><IconDollar /> Deal Valuation</div>
                 <div className="deal-val">{formatMoney(lead.monthly)}<span>/mo</span></div>
                 <div className="deal-annual">{formatMoney(lead.annual)} annual potential</div>
               </div>
 
               <div className="ebox">
-                <div className="ebox-label">🎯 Outreach Strategy</div>
+                <div className="ebox-label"><IconTarget /> Outreach Strategy</div>
                 <div className="outreach-list">
                   {lead.outreach.map((step, i) => (
                     <div key={i} className="ostep">
@@ -67,7 +99,7 @@ export default function LeadCard({ lead, rank, animDelay }) {
               </div>
 
               <div className="ebox">
-                <div className="ebox-label">📊 Buying Signals</div>
+                <div className="ebox-label"><IconTrend /> Buying Signals</div>
                 <div className="signals-list">
                   {lead.signals.map((s, i) => (
                     <div key={i} className="signal-row">
@@ -97,10 +129,10 @@ export default function LeadCard({ lead, rank, animDelay }) {
               strokeLinecap="round"
               strokeDasharray={circ.toFixed(2)}
               strokeDashoffset={circ.toFixed(2)}
-              style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1)' }}
+              style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1)', filter: `drop-shadow(0 0 4px ${meta.color})` }}
             />
           </svg>
-          <div className="score-num" style={{ color: meta.color }}>{lead.score}</div>
+          <div className="score-num" style={{ color: meta.color, textShadow: `0 0 10px ${meta.color}40` }}>{lead.score}</div>
         </div>
         <div className="score-badge-label" style={{ color: meta.color }}>{meta.label}</div>
       </div>
