@@ -11,9 +11,9 @@ const CONFIG = {
   SIMULATE_DELAY_MS: 2800,
   STEP_INTERVAL_MS:  520,
   NUM_LEADS:         5,
-  OR_KEY:            'GROQ_API_KEY=***REMOVED***',
-  OR_URL:            'https://openrouter.ai/api/v1/chat/completions',
-  OR_MODEL:          'anthropic/claude-sonnet-4-5'
+  OR_KEY:            '***REMOVED***',
+  OR_URL:            'https://api.groq.com/openai/v1/chat/completions',
+  OR_MODEL:          'llama-3.3-70b-versatile'
 };
 
 // ── GEOLOCATION via ipapi.co ────────────────────────────────────────────
