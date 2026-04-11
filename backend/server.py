@@ -18,6 +18,7 @@ import time
 import random
 import urllib.request
 import urllib.error
+import urllib.parse
 from datetime import datetime, timedelta
 from collections import defaultdict
 from dotenv import load_dotenv
@@ -389,7 +390,33 @@ def generate_leads():
     search_id = cur.lastrowid
     conn.commit()
 
-    if AI_AVAILABLE:
+    # Try to find real businesses first (Overpass → Nominatim fallback)
+    real_places = []
+    radius = data.get("radius", 25)
+    if location:
+        try:
+            real_places = find_real_businesses(target, location, radius)
+            print(f"[Overpass] Found {len(real_places)} real businesses near {location}")
+        except Exception as e:
+            print(f"[Overpass] Failed: {e}, trying Nominatim...")
+        if not real_places:
+            try:
+                real_places = find_businesses_nominatim(target, location, radius)
+                print(f"[Nominatim] Found {len(real_places)} businesses near {location}")
+            except Exception as e:
+                print(f"[Nominatim] Also failed: {e}")
+
+    if real_places:
+        # Use AI to score and qualify the real businesses
+        if AI_AVAILABLE:
+            try:
+                leads = score_real_leads(real_places, biz, target, service, location, deal_size)
+            except Exception as e:
+                print(f"[AI scoring] Failed, using basic scoring: {e}")
+                leads = basic_score_leads(real_places, biz, service, location, deal_size)
+        else:
+            leads = basic_score_leads(real_places, biz, service, location, deal_size)
+    elif AI_AVAILABLE:
         try:
             leads = generate_with_ai(biz, target, service, location, deal_size)
         except Exception as e:
@@ -491,6 +518,160 @@ def chat_stats():
     return jsonify(dict(stats))
 
 
+# ── REAL PLACE LOOKUP (OpenStreetMap) ─────────────────────────────────
+def geocode_location(query):
+    """Convert location text to lat/lon using Nominatim."""
+    url = f"https://nominatim.openstreetmap.org/search?format=json&limit=1&q={urllib.parse.quote(query)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "SmartLead/2.0", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    if not data:
+        return None
+    return {"lat": float(data[0]["lat"]), "lon": float(data[0]["lon"]), "display": data[0].get("display_name", "")}
+
+# Map target customer keywords to OSM tags
+OSM_TAG_MAP = [
+    (["restaurant", "diner", "eatery", "food"], [("amenity", "restaurant"), ("amenity", "fast_food")]),
+    (["cafe", "coffee"], [("amenity", "cafe")]),
+    (["bar", "pub"], [("amenity", "bar"), ("amenity", "pub")]),
+    (["hotel", "motel", "inn", "lodging"], [("tourism", "hotel"), ("tourism", "motel")]),
+    (["gym", "fitness", "yoga"], [("leisure", "fitness_centre")]),
+    (["salon", "barber", "hair"], [("shop", "hairdresser"), ("shop", "beauty")]),
+    (["beauty", "spa", "nail"], [("shop", "beauty"), ("leisure", "spa")]),
+    (["dentist", "dental"], [("amenity", "dentist")]),
+    (["clinic", "doctor", "medical"], [("amenity", "clinic"), ("amenity", "doctors")]),
+    (["hospital"], [("amenity", "hospital")]),
+    (["pharmacy", "drugstore"], [("amenity", "pharmacy")]),
+    (["vet", "veterinar"], [("amenity", "veterinary")]),
+    (["lawyer", "law firm", "legal", "attorney"], [("office", "lawyer")]),
+    (["accountant", "accounting", "cpa"], [("office", "accountant")]),
+    (["real estate", "realtor"], [("office", "estate_agent")]),
+    (["auto repair", "mechanic", "car repair"], [("shop", "car_repair")]),
+    (["grocery", "supermarket"], [("shop", "supermarket"), ("shop", "convenience")]),
+    (["bakery"], [("shop", "bakery")]),
+    (["florist", "flower"], [("shop", "florist")]),
+    (["clothing", "boutique", "fashion"], [("shop", "clothes")]),
+    (["school", "tutor", "academy"], [("amenity", "school")]),
+    (["church", "mosque", "temple"], [("amenity", "place_of_worship")]),
+    (["bank"], [("amenity", "bank")]),
+    (["pet shop", "pet store"], [("shop", "pet")]),
+    (["electronics", "computer", "phone"], [("shop", "electronics")]),
+    (["laundry", "dry clean"], [("shop", "laundry"), ("shop", "dry_cleaning")]),
+]
+
+def get_osm_tags(target_text):
+    """Match target customer text to OSM tags."""
+    lower = target_text.lower()
+    for keywords, tags in OSM_TAG_MAP:
+        if any(kw in lower for kw in keywords):
+            return tags
+    return [("amenity", "restaurant")]  # default fallback
+
+def find_real_businesses(target, location, radius_miles=25):
+    """Find real businesses near a location using OpenStreetMap Overpass API."""
+    geo = geocode_location(location)
+    if not geo:
+        return []
+
+    tags = get_osm_tags(target)
+    radius_m = radius_miles * 1609  # miles to meters
+    lat, lon = geo["lat"], geo["lon"]
+
+    # Build Overpass query
+    tag_filters = "".join(
+        f'node["{k}"="{v}"](around:{radius_m},{lat},{lon});' for k, v in tags
+    )
+    query = f'[out:json][timeout:15];({tag_filters});out body 15;'
+
+    payload = urllib.parse.urlencode({"data": query}).encode("utf-8")
+    req = urllib.request.Request(
+        "https://overpass-api.de/api/interpreter",
+        data=payload,
+        headers={"User-Agent": "SmartLead/2.0"},
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[Overpass] Query failed: {e}")
+        return []
+
+    places = []
+    for el in data.get("elements", []):
+        t = el.get("tags", {})
+        name = t.get("name")
+        if not name:
+            continue
+
+        street = t.get("addr:street", "")
+        house  = t.get("addr:housenumber", "")
+        city   = t.get("addr:city", "")
+        state  = t.get("addr:state", "")
+        post   = t.get("addr:postcode", "")
+
+        addr_parts = []
+        if house and street:
+            addr_parts.append(f"{house} {street}")
+        elif street:
+            addr_parts.append(street)
+        if city:
+            addr_parts.append(city)
+        if state:
+            addr_parts.append(state)
+        if post:
+            addr_parts.append(post)
+
+        address = ", ".join(addr_parts) if addr_parts else f"{el.get('lat','')}, {el.get('lon','')}"
+
+        places.append({
+            "name": name,
+            "address": address,
+            "lat": el.get("lat"),
+            "lon": el.get("lon"),
+            "industry": t.get("amenity") or t.get("shop") or t.get("office") or t.get("tourism") or t.get("leisure") or "Business",
+            "phone": t.get("phone", ""),
+            "website": t.get("website", ""),
+        })
+
+    return places[:10]  # return up to 10
+
+
+def find_businesses_nominatim(target, location, radius_miles=25):
+    """Fallback: use Nominatim search to find businesses by name/type near location."""
+    search_terms = target.lower().split()
+    # Use the most descriptive keyword
+    keyword = next((w for w in search_terms if len(w) > 3), search_terms[0] if search_terms else "business")
+    query = f"{keyword} near {location}"
+    url = f"https://nominatim.openstreetmap.org/search?format=json&limit=8&q={urllib.parse.quote(query)}&addressdetails=1"
+    req = urllib.request.Request(url, headers={"User-Agent": "SmartLead/2.0", "Accept": "application/json"})
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[Nominatim search] Failed: {e}")
+        return []
+
+    places = []
+    for item in data:
+        name = item.get("display_name", "").split(",")[0].strip()
+        addr = item.get("display_name", "")
+        if not name or len(name) < 3:
+            continue
+        places.append({
+            "name": name,
+            "address": addr,
+            "lat": float(item.get("lat", 0)),
+            "lon": float(item.get("lon", 0)),
+            "industry": item.get("type", "business").replace("_", " ").title(),
+            "phone": "",
+            "website": "",
+        })
+    return places[:8]
+
+
 # ── MOCK LEAD GENERATOR ───────────────────────────────────────────────
 PREFIXES  = ['Apex','Summit','Pinnacle','Nexus','Vantage','Sterling','Crest','Meridian','Horizon','Zenith','Cascade','Vertex']
 SUFFIXES  = ['Solutions','Group','Partners','Co','Ventures','Collective','Studio','Works','Labs','Agency','Consulting','Dynamics']
@@ -531,6 +712,94 @@ def generate_mock_leads(biz, target, service, location, deal_size):
             ]
         })
     return sorted(leads, key=lambda x: x["score"], reverse=True)
+
+
+def basic_score_leads(places, biz, service, location, deal_size):
+    """Score real places with basic heuristics (no AI needed)."""
+    min_val, max_val = DEAL_RANGES.get(deal_size, DEAL_RANGES['medium'])
+    leads = []
+    for i, p in enumerate(places[:5]):
+        score = random.randint(58, 95)
+        monthly = round((min_val + (max_val - min_val) * (score / 100)) / 100) * 100
+        leads.append({
+            "name": p["name"],
+            "address": p["address"],
+            "score": score,
+            "industry": p["industry"].replace("_", " ").title(),
+            "city": location,
+            "size": random.choice(SIZES),
+            "decisionMaker": random.choice(ROLES),
+            "painPoint": random.choice(PAINS),
+            "signals": random.sample(SIGNALS, k=random.randint(2, 4)),
+            "monthly": monthly,
+            "annual": monthly * 12,
+            "reason": f"{p['name']} at {p['address']} is a real business in {location} that could benefit from {service}. Their location and industry make them a strong potential client.",
+            "outreach": [
+                f"Visit {p['name']} in person at {p['address']} to introduce your services",
+                f"Send a personalised email highlighting how {service} can help their {p['industry'].replace('_',' ')} business",
+                "Offer a free consultation or audit to demonstrate immediate value",
+                "Follow up in 3-5 days with a case study from a similar client"
+            ]
+        })
+    return sorted(leads, key=lambda x: x["score"], reverse=True)
+
+
+def score_real_leads(places, biz, target, service, location, deal_size):
+    """Use AI to score and qualify real businesses found via OpenStreetMap."""
+    place_list = "\n".join(
+        f"- {p['name']} at {p['address']} (type: {p['industry']})"
+        for p in places[:7]
+    )
+
+    prompt = f"""You are a B2B lead qualification engine. I found these REAL businesses near {location}:
+
+{place_list}
+
+My business: {biz}
+Target customer: {target}
+Service I offer: {service}
+Deal size: {deal_size}
+
+Pick the 5 best matches and score them. Return a JSON object with key "leads" containing an array.
+
+Each lead must have:
+- name: string (exact business name from the list above)
+- address: string (exact address from the list above)
+- score: integer 55-97 (how good a fit they are)
+- industry: string
+- city: string ("{location}")
+- size: string (estimate employee range)
+- decisionMaker: string (likely job title to contact)
+- painPoint: string (likely challenge they face)
+- signals: array of 2-4 strings (why they might buy)
+- monthly: integer (estimated USD monthly deal value)
+- annual: integer (monthly * 12)
+- reason: string (2 sentences why they're a good lead)
+- outreach: array of 4 strings (personalized outreach steps)
+
+IMPORTANT: Use the EXACT names and addresses from the list. Do not invent businesses.
+Return ONLY the JSON object. No markdown."""
+
+    payload = json.dumps({
+        "model": GROQ_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 2500,
+        "response_format": {"type": "json_object"},
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.groq.com/openai/v1/chat/completions", data=payload,
+        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}, method="POST"
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        body = json.loads(resp.read().decode("utf-8"))
+    raw = body["choices"][0]["message"]["content"].strip()
+    clean = raw.replace("```json", "").replace("```", "").strip()
+    parsed = json.loads(clean)
+    if isinstance(parsed, dict):
+        for v in parsed.values():
+            if isinstance(v, list):
+                return v
+    return parsed
 
 
 def generate_with_ai(biz, target, service, location, deal_size):
