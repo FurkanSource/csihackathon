@@ -11,42 +11,116 @@ const CONFIG = {
   SIMULATE_DELAY_MS: 2800,
   STEP_INTERVAL_MS:  520,
   NUM_LEADS:         5,
-  API_KEY:           'YOUR_API_KEY_HERE',  // Replace for AI-powered mode
-  USE_AI:            false                 // Set true after adding API key
+  GEMINI_KEY:        'AIzaSyAhxL8PsfqcQVx33MJWvyOZBBQ7Pm4GpOc',
+  GEMINI_URL:        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 };
 
-// ── DATA LIBRARY ───────────────────────────────────────────────────────
-const DATA = {
-  prefixes: ['Apex','Summit','Pinnacle','Nexus','Vantage','Sterling','Crest','Meridian','Horizon','Zenith','Cascade','Vertex','Luminary','Ironclad','Eclipse'],
-  suffixes: ['Solutions','Group','Partners','Co','Ventures','Collective','Studio','Works','Labs','Agency','Consulting','Dynamics','Systems','Enterprises','Capital'],
-  industries: ['Technology','Hospitality','Healthcare','Finance','Retail','Real Estate','Education','Manufacturing','Legal','Logistics','Media','Construction','Fashion','Food & Beverage','Automotive'],
-  sizes: ['2–10 employees','11–50 employees','51–200 employees','201–500 employees'],
-  decisionMakers: ['CEO','Founder','Marketing Director','COO','Head of Growth','VP of Operations','CMO','Managing Director','Director of Sales','Chief Revenue Officer'],
-  cities: ['New York, NY','Los Angeles, CA','Chicago, IL','Houston, TX','Miami, FL','Seattle, WA','Austin, TX','Boston, MA','Denver, CO','Atlanta, GA','Phoenix, AZ','San Diego, CA','Nashville, TN','Portland, OR','Charlotte, NC'],
-  signals: ['Recently raised funding','Actively hiring','New product launched','Rebranding underway','Expanding to new markets','High review volume','Featured in industry press','Won recent award','Opened new location','Signed major partnership'],
-  painPoints: [
-    'struggling with inconsistent lead generation and client acquisition',
-    'lacking a strong digital presence in an increasingly competitive market',
-    'spending too much time on manual processes that could be automated',
-    'losing customers to competitors with stronger online visibility',
-    'unable to scale operations without better systems',
-    'experiencing declining engagement with their current marketing strategy',
-    'facing high customer churn due to poor onboarding experiences',
-    'missing revenue targets due to an unoptimized sales funnel'
-  ]
+// ── GEOLOCATION via ipapi.co ────────────────────────────────────────────
+const GeoLocation = {
+  data: null,
+
+  async detect() {
+    try {
+      const res  = await fetch('https://ipapi.co/json/');
+      const json = await res.json();
+      this.data  = {
+        city:      json.city      || '',
+        region:    json.region    || '',
+        country:   json.country_name || '',
+        countryCode: json.country_code || '',
+        latitude:  json.latitude  || null,
+        longitude: json.longitude || null,
+        timezone:  json.timezone  || '',
+        currency:  json.currency  || '',
+        org:       json.org       || ''
+      };
+      return this.data;
+    } catch (e) {
+      console.warn('ipapi.co geolocation failed, continuing without it.', e);
+      this.data = null;
+      return null;
+    }
+  },
+
+  label() {
+    if (!this.data) return '';
+    const { city, region, country } = this.data;
+    return [city, region, country].filter(Boolean).join(', ');
+  }
 };
 
-const DEAL_RANGES = {
-  small:      [500,    2000],
-  medium:     [2000,   10000],
-  large:      [10000,  50000],
-  enterprise: [50000,  200000]
-};
+// ── GEMINI LEAD GENERATION ──────────────────────────────────────────────
+async function generateWithGemini(biz, target, service, location, dealSize) {
+  const geoLabel    = location || GeoLocation.label() || 'Not specified';
+  const geoContext  = GeoLocation.data
+    ? `Detected user location: ${geoLabel} (lat: ${GeoLocation.data.latitude}, lng: ${GeoLocation.data.longitude}). Use this to find leads in or near this area.`
+    : `User-specified location: ${geoLabel}`;
+
+  const dealRanges = {
+    small:      '$500–$2,000/month',
+    medium:     '$2,000–$10,000/month',
+    large:      '$10,000–$50,000/month',
+    enterprise: '$50,000+/month'
+  };
+
+  const prompt = `You are a B2B sales intelligence engine. Generate exactly 5 realistic, highly specific potential business leads for the following:
+
+Business Type: ${biz}
+Target Customer: ${target}
+Service Offered: ${service}
+Deal Size Target: ${dealRanges[dealSize] || dealRanges.medium}
+${geoContext}
+
+Return ONLY a valid JSON array. No markdown, no explanation, no code fences. Each object must have exactly these fields:
+{
+  "name": "Realistic company name",
+  "industry": "Specific industry sector",
+  "size": "e.g. 11–50 employees",
+  "city": "City, Region/State based on the detected location",
+  "decisionMaker": "Job title of the decision maker",
+  "score": <integer between 40 and 97>,
+  "monthly": <integer monthly deal value in USD matching the deal size range>,
+  "annual": <monthly * 12>,
+  "painPoint": "One sentence describing their main pain point relevant to the service",
+  "reason": "2–3 sentence explanation of why this company is a strong lead for the service offered",
+  "outreach": [
+    "Step 1 outreach action",
+    "Step 2 outreach action",
+    "Step 3 outreach action",
+    "Step 4 follow-up action"
+  ],
+  "signals": ["Signal 1", "Signal 2", "Signal 3"]
+}
+
+Make companies feel real and location-specific. Higher scores = stronger fit. Vary the scores naturally.`;
+
+  const res = await fetch(`${CONFIG.GEMINI_URL}?key=${CONFIG.GEMINI_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.85, maxOutputTokens: 2048 }
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Gemini API error ${res.status}`);
+  }
+
+  const data   = await res.json();
+  const raw    = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const clean  = raw.replace(/```json|```/g, '').trim();
+  const leads  = JSON.parse(clean);
+
+  if (!Array.isArray(leads) || leads.length === 0) throw new Error('No leads returned from Gemini.');
+
+  return leads.sort((a, b) => b.score - a.score);
+}
 
 // ── UTILITIES ──────────────────────────────────────────────────────────
-const rand = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const rand    = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const unique = (arr, key) => arr.filter((v, i, s) => s.findIndex(x => x[key] === v[key]) === i);
 
 function formatMoney(n) {
   if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
@@ -63,80 +137,6 @@ function getScoreMeta(score) {
   if (score >= 70) return { label: 'Strong',    stroke: '#00d4ff', color: '#00d4ff' };
   if (score >= 55) return { label: 'Warm',      stroke: '#f59e0b', color: '#f59e0b' };
   return               { label: 'Cold',      stroke: '#ef4444', color: '#ef4444' };
-}
-
-// ── SCORING ENGINE ─────────────────────────────────────────────────────
-function scoreLeadIntelligence(biz, target, service, dealSize, leadData) {
-  // Simulate intelligent multi-factor scoring
-  let base = randInt(48, 96);
-
-  // Boost score for enterprise deals
-  if (dealSize === 'large' || dealSize === 'enterprise') base = Math.max(base, randInt(65, 97));
-
-  // Signal boost: certain signals indicate stronger buying intent
-  const hotSignals = ['Recently raised funding','Actively hiring','New product launched','Expanding to new markets'];
-  const hasHotSignal = leadData.signals.some(s => hotSignals.includes(s));
-  if (hasHotSignal) base = Math.min(100, base + randInt(3, 8));
-
-  return Math.min(100, base);
-}
-
-// ── LEAD BUILDER ───────────────────────────────────────────────────────
-function buildLeads(biz, target, service, location, dealSize) {
-  const usedNames = new Set();
-  const leads = [];
-
-  for (let i = 0; i < CONFIG.NUM_LEADS; i++) {
-    // Generate unique company name
-    let name;
-    do {
-      name = `${rand(DATA.prefixes)} ${rand(DATA.suffixes)}`;
-    } while (usedNames.has(name));
-    usedNames.add(name);
-
-    const industry       = rand(DATA.industries);
-    const size           = rand(DATA.sizes);
-    const city           = location ? location : rand(DATA.cities);
-    const decisionMaker  = rand(DATA.decisionMakers);
-    const painPoint      = rand(DATA.painPoints);
-    const signals        = shuffle(DATA.signals).slice(0, randInt(2, 4));
-
-    const leadData = { signals };
-    const score    = scoreLeadIntelligence(biz, target, service, dealSize, leadData);
-
-    const [min, max] = DEAL_RANGES[dealSize] || DEAL_RANGES.medium;
-    const monthly    = Math.round((min + (max - min) * (score / 100)) / 100) * 100;
-    const annual     = monthly * 12;
-
-    const reason = buildReason(name, size, industry, city, painPoint, service, signals[0]);
-    const outreach = buildOutreach(biz, target, service, decisionMaker, industry, signals);
-
-    leads.push({ name, score, industry, size, city, decisionMaker, painPoint, signals, monthly, annual, reason, outreach });
-  }
-
-  return leads.sort((a, b) => b.score - a.score);
-}
-
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = randInt(0, i);
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function buildReason(name, size, industry, city, painPoint, service, topSignal) {
-  return `${name} is a ${size} ${industry.toLowerCase()} company based in ${city} that is currently ${painPoint}. Their recent ${topSignal.toLowerCase()} is a strong indicator of budget availability and active vendor evaluation, making them an ideal fit for ${service}.`;
-}
-
-function buildOutreach(biz, target, service, decisionMaker, industry, signals) {
-  return [
-    `Connect with their ${decisionMaker} on LinkedIn — mention their ${signals[0].toLowerCase()} as a conversation opener`,
-    `Send a personalised cold email with a subject line referencing a pain point common in the ${industry.toLowerCase()} space`,
-    `Offer a free 20-minute strategy call or audit — lead with value before pitching`,
-    `Follow up in 3–5 days with a case study showing ROI for a similar client in their industry`
-  ];
 }
 
 // ── STATE ──────────────────────────────────────────────────────────────
@@ -164,11 +164,11 @@ function showScreen(id) {
 
 // ── LOADING SEQUENCE ───────────────────────────────────────────────────
 const LOG_STEPS = [
-  { sub: 'Analyzing your business profile...',        pct: 15 },
-  { sub: 'Cross-referencing 50,000+ companies...',    pct: 35 },
-  { sub: 'Running qualification algorithms...',       pct: 58 },
-  { sub: 'Generating personalized strategies...',     pct: 78 },
-  { sub: 'Calculating deal valuations...',            pct: 95 }
+  { sub: 'Detecting your location...',                pct: 12 },
+  { sub: 'Analyzing your business profile...',        pct: 28 },
+  { sub: 'Cross-referencing local companies...',      pct: 48 },
+  { sub: 'Running AI qualification engine...',        pct: 70 },
+  { sub: 'Generating personalized strategies...',     pct: 88 }
 ];
 
 function startLoading() {
@@ -177,7 +177,7 @@ function startLoading() {
     const el = document.getElementById(`log-${i}`);
     if (el) el.className = 'log-item';
   });
-  setProgress(8);
+  setProgress(5);
   document.getElementById('loading-sub').textContent = 'Initializing lead discovery engine...';
   activateLogStep(0);
 
@@ -219,14 +219,14 @@ function setProgress(pct) {
 // ── RENDER RESULTS ─────────────────────────────────────────────────────
 function renderResults(leads, meta) {
   const { biz, location, dealSize } = meta;
-  const loc = location || 'Nationwide';
+  const loc           = location || GeoLocation.label() || 'Detected Location';
   const totalPipeline = leads.reduce((s, l) => s + l.annual, 0);
   const avgScore      = Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length);
   const hotCount      = leads.filter(l => l.score >= 85).length;
 
   // Nav
-  document.getElementById('nav-leads-found').textContent     = leads.length;
-  document.getElementById('nav-total-pipeline').textContent  = formatMoney(totalPipeline);
+  document.getElementById('nav-leads-found').textContent    = leads.length;
+  document.getElementById('nav-total-pipeline').textContent = formatMoney(totalPipeline);
 
   // Header
   document.getElementById('results-title').textContent = `Lead Report — ${biz}`;
@@ -246,7 +246,6 @@ function renderResults(leads, meta) {
     </div>
   `).join('');
 
-  // Lead cards
   renderLeadCards(leads);
 }
 
@@ -341,7 +340,6 @@ function renderLeadCards(leads) {
     card.addEventListener('click', () => SmartLead.toggleExpand(i, card));
     grid.appendChild(card);
 
-    // Animate ring after paint
     requestAnimationFrame(() => {
       setTimeout(() => {
         const ring = document.getElementById(`ring-${i}`);
@@ -354,7 +352,7 @@ function renderLeadCards(leads) {
 // ── SMARTLEAD PUBLIC API ────────────────────────────────────────────────
 const SmartLead = {
 
-  generate() {
+  async generate() {
     const biz      = document.getElementById('biz-type').value.trim();
     const target   = document.getElementById('target').value.trim();
     const service  = document.getElementById('service').value.trim();
@@ -372,22 +370,41 @@ const SmartLead = {
 
     const meta = { biz, target, service, location, dealSize };
 
-    setTimeout(() => {
+    try {
+      // Step 1: Detect location silently (if user didn't provide one)
+      if (!location && !GeoLocation.data) {
+        await GeoLocation.detect();
+      }
+
+      // Step 2: Generate leads with Gemini + location context
+      // Run loading animation in parallel — wait for whichever takes longer
+      const [leads] = await Promise.all([
+        generateWithGemini(biz, target, service, location, dealSize),
+        new Promise(resolve => setTimeout(resolve, CONFIG.SIMULATE_DELAY_MS))
+      ]);
+
       stopLoading();
+
       setTimeout(() => {
-        const leads = buildLeads(biz, target, service, location, dealSize);
         State.set(leads, meta);
         showScreen('results-screen');
         renderResults(leads, meta);
       }, 350);
-    }, CONFIG.SIMULATE_DELAY_MS);
+
+    } catch (err) {
+      stopLoading();
+      console.error('SmartLead generation error:', err);
+      alert(`Lead generation failed: ${err.message}\n\nCheck your API key or network connection.`);
+      document.getElementById('forge-btn').disabled = false;
+      showScreen('input-screen');
+    }
   },
 
   loadSample(i) {
     const samples = [
-      { biz: 'Digital Marketing Agency', target: 'Small restaurants and cafés', service: 'Social media management & paid ads', location: 'Miami, FL', deal: 'medium' },
-      { biz: 'SaaS Product Company',     target: 'Mid-size B2B tech teams',      service: 'Project management software',       location: 'Austin, TX', deal: 'large' },
-      { biz: 'Healthcare Consultancy',   target: 'Private clinics and GP surgeries', service: 'Operations & compliance consulting', location: 'New York, NY', deal: 'large' }
+      { biz: 'Digital Marketing Agency', target: 'Small restaurants and cafés', service: 'Social media management & paid ads', location: '', deal: 'medium' },
+      { biz: 'SaaS Product Company',     target: 'Mid-size B2B tech teams',      service: 'Project management software',       location: '', deal: 'large' },
+      { biz: 'Healthcare Consultancy',   target: 'Private clinics and GP surgeries', service: 'Operations & compliance consulting', location: '', deal: 'large' }
     ];
     const s = samples[i];
     document.getElementById('biz-type').value  = s.biz;
@@ -398,10 +415,9 @@ const SmartLead = {
   },
 
   toggleExpand(index, card) {
-    const expand  = document.getElementById(`expand-${index}`);
-    const isOpen  = expand.style.display === 'block';
+    const expand = document.getElementById(`expand-${index}`);
+    const isOpen = expand.style.display === 'block';
 
-    // Close all
     document.querySelectorAll('.lead-expand').forEach(e => e.style.display = 'none');
     document.querySelectorAll('.lead-card').forEach(c => c.classList.remove('expanded'));
 
@@ -422,9 +438,9 @@ const SmartLead = {
 
   sort(by) {
     const sorters = {
-      score:  (a, b) => b.score - a.score,
-      deal:   (a, b) => b.annual - a.annual,
-      name:   (a, b) => a.name.localeCompare(b.name)
+      score: (a, b) => b.score - a.score,
+      deal:  (a, b) => b.annual - a.annual,
+      name:  (a, b) => a.name.localeCompare(b.name)
     };
     State.filtered = [...State.filtered].sort(sorters[by] || sorters.score);
     renderLeadCards(State.filtered);
@@ -444,9 +460,8 @@ const SmartLead = {
 
   renderDB() {
     const body = document.getElementById('db-body');
-    const meta = getScoreMeta;
     body.innerHTML = State.saved.map(l => {
-      const m = meta(l.score);
+      const m = getScoreMeta(l.score);
       return `<tr>
         <td style="color:var(--text)">${l.name}</td>
         <td style="color:${m.color};font-family:var(--font-mono)">${l.score}</td>
@@ -483,14 +498,22 @@ const SmartLead = {
   }
 };
 
+// ── SILENT LOCATION PREFETCH ON PAGE LOAD ──────────────────────────────
+// Detect location in the background as soon as the page loads
+// so it's ready instantly when the user hits Generate
+window.addEventListener('DOMContentLoaded', () => {
+  GeoLocation.detect();
+});
+
 // ── ANIMATED CANVAS BACKGROUND ─────────────────────────────────────────
 (function initCanvas() {
   const canvas = document.getElementById('bg-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
-  let W, H, nodes = [], edges = [];
+  let W, H;
   const MAX_NODES = 40;
   const CONNECT_DIST = 140;
+  let nodes = [];
 
   function resize() {
     W = canvas.width  = window.innerWidth;
@@ -500,8 +523,8 @@ const SmartLead = {
 
   function buildGraph() {
     nodes = Array.from({ length: MAX_NODES }, () => ({
-      x: Math.random() * W,
-      y: Math.random() * H,
+      x:  Math.random() * W,
+      y:  Math.random() * H,
       vx: (Math.random() - 0.5) * 0.3,
       vy: (Math.random() - 0.5) * 0.3,
       r:  Math.random() * 1.5 + 0.5
@@ -511,14 +534,12 @@ const SmartLead = {
   function tick(t) {
     ctx.clearRect(0, 0, W, H);
 
-    // Move nodes
     nodes.forEach(n => {
       n.x += n.vx; n.y += n.vy;
       if (n.x < 0 || n.x > W) n.vx *= -1;
       if (n.y < 0 || n.y > H) n.vy *= -1;
     });
 
-    // Draw edges
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const dx   = nodes[i].x - nodes[j].x;
@@ -536,7 +557,6 @@ const SmartLead = {
       }
     }
 
-    // Draw nodes
     nodes.forEach(n => {
       const pulse = 0.5 + 0.5 * Math.sin(t * 0.001 + n.x);
       ctx.beginPath();
