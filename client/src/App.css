@@ -69,6 +69,7 @@
   background: var(--surface);
   transition: all 0.2s var(--ease);
   display: flex; align-items: center; gap: 5px;
+  position: relative; overflow: hidden;
 }
 .pill:hover {
   border-color: var(--border3);
@@ -271,6 +272,7 @@
   padding: 5px 14px; background: transparent;
   display: flex; align-items: center; gap: 4px;
   transition: all 0.2s var(--ease);
+  position: relative; overflow: hidden;
 }
 .chip:hover {
   border-color: var(--border3); color: var(--text);

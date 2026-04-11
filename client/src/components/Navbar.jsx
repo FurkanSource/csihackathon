@@ -1,13 +1,13 @@
 import React from 'react'
 import './Navbar.css'
 
-export default function Navbar({ totalPipeline, leadsFound }) {
+export default function Navbar({ totalPipeline, leadsFound, onHome }) {
   return (
     <nav className="navbar">
-      <div className="nav-logo">
+      <button className="nav-logo" onClick={onHome} type="button">
         <div className="nav-dot" />
         SmartLead
-      </div>
+      </button>
 
       <span className="nav-badge">AI LEAD ENGINE v2.0</span>
 

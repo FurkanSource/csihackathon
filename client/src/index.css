@@ -60,25 +60,15 @@ body {
 button { cursor: pointer; font-family: var(--font-body); }
 input, select, textarea { font-family: var(--font-body); }
 
-/* ── SMOOTH KEYFRAMES ── */
+/* ── CLEAN KEYFRAMES ── */
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes fadeUp3D {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 @keyframes cardIn {
   from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes cardIn3D {
-  from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -99,38 +89,6 @@ input, select, textarea { font-family: var(--font-body); }
 }
 
 @keyframes spinRing { to { transform: rotate(360deg); } }
-@keyframes corePulse { from { transform: scale(0.9); } to { transform: scale(1.1); } }
-
-@keyframes dotPulse {
-  0%,100% { box-shadow: 0 0 6px var(--accent), 0 0 16px rgba(108,99,255,0.25); }
-  50%     { box-shadow: 0 0 3px var(--accent), 0 0 8px rgba(108,99,255,0.12); }
-}
-
-@keyframes gradientFlow {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-@keyframes breathe {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.75; }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
-}
-
-@keyframes shimmer {
-  0%   { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes ring3D {
-  0%   { transform: rotateX(70deg) rotateZ(0deg); }
-  100% { transform: rotateX(70deg) rotateZ(360deg); }
-}
 
 @keyframes burstOut {
   0%   { transform: translate(0, 0) scale(1); opacity: 1; }
@@ -160,12 +118,6 @@ input, select, textarea { font-family: var(--font-body); }
   40% { transform: translateX(5px); }
   60% { transform: translateX(-3px); }
   80% { transform: translateX(3px); }
-}
-
-@keyframes iridescent {
-  0%   { border-color: rgba(255,255,255,0.06); }
-  50%  { border-color: rgba(108,99,255,0.12); }
-  100% { border-color: rgba(255,255,255,0.06); }
 }
 
 @media (prefers-reduced-motion: reduce) {

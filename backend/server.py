@@ -534,11 +534,27 @@ def generate_mock_leads(biz, target, service, location, deal_size):
 
 
 def generate_with_ai(biz, target, service, location, deal_size):
-    prompt = f"""Generate 5 B2B business leads as a JSON object with key "leads" containing an array.
+    prompt = f"""Generate 5 real B2B business leads as a JSON object with key "leads" containing an array.
 
 Business: {biz} | Target: {target} | Service: {service} | Location: {location or 'Anywhere'} | Deal: {deal_size}
 
-Each lead: name, score(55-97), industry, city, size, decisionMaker, painPoint, signals(2-4 items), monthly(int USD), annual(monthly*12), reason(2 sentences), outreach(4 steps).
+IMPORTANT: Use REAL business names that actually exist in the specified location. Include their real street address.
+
+Each lead must have these fields:
+- name: string (real business name that exists)
+- address: string (real street address, e.g. "123 Main St, Miami, FL 33101")
+- score: integer 55-97
+- industry: string
+- city: string (city, state)
+- size: string (employee range like "2-10 employees")
+- decisionMaker: string (job title)
+- painPoint: string
+- signals: array of 2-4 strings
+- monthly: integer (USD)
+- annual: integer (monthly * 12)
+- reason: string (2 sentences why they're a good lead)
+- outreach: array of 4 strings (step-by-step outreach plan)
+
 Return ONLY the JSON object. No markdown."""
 
     payload = json.dumps({

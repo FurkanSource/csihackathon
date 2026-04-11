@@ -1,27 +1,24 @@
-/* ── SUMMARY CARD : Holographic Glass ── */
+/* ── SUMMARY CARD : Clean Modern Card ── */
 
 .scard {
   background: var(--surface);
-  backdrop-filter: blur(22px) saturate(1.3);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1rem 1.25rem;
-  transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
-  animation: fadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-  box-shadow: 0 2px 18px rgba(0, 0, 0, 0.22);
+  transition: all 0.2s var(--ease);
+  animation: fadeUp 0.3s var(--ease) both;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   position: relative;
   overflow: hidden;
-  transform-style: preserve-3d;
 }
 
-/* Staggered pop-in */
+/* Staggered entrance */
 .scard:nth-child(1) { animation-delay: 0s; }
-.scard:nth-child(2) { animation-delay: 0.08s; }
-.scard:nth-child(3) { animation-delay: 0.16s; }
-.scard:nth-child(4) { animation-delay: 0.24s; }
+.scard:nth-child(2) { animation-delay: 0.06s; }
+.scard:nth-child(3) { animation-delay: 0.12s; }
+.scard:nth-child(4) { animation-delay: 0.18s; }
 
-/* Iridescent top line */
+/* Subtle accent top line */
 .scard::before {
   content: '';
   position: absolute;
@@ -29,47 +26,18 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(123, 140, 255, 0.32) 15%,
-    rgba(168, 85, 247, 0.28) 40%,
-    rgba(94, 234, 212, 0.22) 65%,
-    rgba(236, 72, 153, 0.16) 85%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: gradientFlow 5s ease infinite;
-}
-
-/* Holographic surface sheen on hover */
-.scard::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(123, 140, 255, 0.035) 0%,
-    transparent 35%,
-    rgba(168, 85, 247, 0.025) 60%,
-    rgba(94, 234, 212, 0.015) 85%,
-    transparent 100%
-  );
-  pointer-events: none;
+  background: linear-gradient(90deg, var(--accent), var(--purple));
   opacity: 0;
-  transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.2s var(--ease);
 }
-.scard:hover::after {
+.scard:hover::before {
   opacity: 1;
 }
 
 .scard:hover {
   border-color: var(--border3);
-  box-shadow:
-    0 14px 45px rgba(123, 140, 255, 0.06),
-    0 0 55px rgba(168, 85, 247, 0.03),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transform: perspective(600px) translateY(-6px) translateZ(15px) rotateX(3deg);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .scard-label {
@@ -79,7 +47,7 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-bottom: 8px;
-  transition: color 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color 0.2s var(--ease);
 }
 .scard:hover .scard-label {
   color: var(--text2);
@@ -92,60 +60,31 @@
   letter-spacing: -0.02em;
   line-height: 1;
   margin-bottom: 4px;
-  transition: text-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .scard-sub {
   font-size: 11px;
   color: var(--text3);
-  transition: color 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: color 0.2s var(--ease);
 }
 .scard:hover .scard-sub {
   color: var(--text2);
 }
 
-/* ── Color variants with soft glow on hover ── */
+/* ── Color variants — clean flat text, no glow ── */
 
 .scard-val.c-accent {
   color: var(--accent);
-  text-shadow: 0 0 14px rgba(123, 140, 255, 0.25);
-}
-.scard:hover .scard-val.c-accent {
-  text-shadow:
-    0 0 22px rgba(123, 140, 255, 0.45),
-    0 0 50px rgba(123, 140, 255, 0.15),
-    0 0 80px rgba(168, 85, 247, 0.06);
 }
 
 .scard-val.c-green {
   color: var(--green);
-  text-shadow: 0 0 14px rgba(52, 211, 153, 0.25);
-}
-.scard:hover .scard-val.c-green {
-  text-shadow:
-    0 0 22px rgba(52, 211, 153, 0.45),
-    0 0 50px rgba(52, 211, 153, 0.15),
-    0 0 80px rgba(94, 234, 212, 0.06);
 }
 
 .scard-val.c-gold {
   color: var(--gold);
-  text-shadow: 0 0 14px rgba(251, 191, 36, 0.25);
-}
-.scard:hover .scard-val.c-gold {
-  text-shadow:
-    0 0 22px rgba(251, 191, 36, 0.45),
-    0 0 50px rgba(251, 191, 36, 0.15),
-    0 0 80px rgba(251, 191, 36, 0.06);
 }
 
 .scard-val.c-purple {
   color: var(--purple-light);
-  text-shadow: 0 0 14px rgba(192, 132, 252, 0.25);
-}
-.scard:hover .scard-val.c-purple {
-  text-shadow:
-    0 0 22px rgba(192, 132, 252, 0.45),
-    0 0 50px rgba(192, 132, 252, 0.15),
-    0 0 80px rgba(168, 85, 247, 0.06);
 }

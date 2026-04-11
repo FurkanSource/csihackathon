@@ -422,6 +422,7 @@ export default function App() {
         <Navbar
           totalPipeline={leads.length ? formatMoney(totalPipeline) : '$0'}
           leadsFound={leads.length}
+          onHome={handleReset}
         />
 
         {/* ── INPUT SCREEN ── */}
