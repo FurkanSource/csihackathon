@@ -15,11 +15,11 @@
 
 // ── CONFIG ─────────────────────────────────────────────────────────────
 const CONFIG = {
-  SIMULATE_DELAY_MS: 2800,
-  STEP_INTERVAL_MS:  520,
+  SIMULATE_DELAY_MS: 900,
+  STEP_INTERVAL_MS:  260,
   OR_KEY:            '***REMOVED***',
   OR_URL:            'https://api.groq.com/openai/v1/chat/completions',
-  OR_MODEL:          'llama-3.3-70b-versatile',
+  OR_MODEL:          'llama-3.1-8b-instant',
   CHAT_LIMIT:        5,
   SERVER_URL:        'http://localhost:5500'
 };
@@ -166,9 +166,59 @@ function showValidationError(message) {
 }
 function clearValidationError() { const e = document.getElementById('validation-error'); if (e) e.remove(); }
 
-// ── GOOGLE MAPS — uses full street address for precise pinning ─────────
-function mapsUrl(address) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+// ── LOADING-SCREEN ERROR DISPLAY (debug) ──────────────────────────────
+function showLoadingError(err) {
+  const box = document.getElementById('loading-error');
+  const msg = document.getElementById('loading-error-msg');
+  if (!box || !msg) return;
+  const text = err && (err.stack || err.message) ? (err.message + (err.stack ? '\n\n' + err.stack : '')) : String(err);
+  msg.textContent = text;
+  box.style.display = 'block';
+}
+function hideLoadingError() {
+  const box = document.getElementById('loading-error');
+  if (box) { box.style.display = 'none'; }
+}
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[SmartLead] unhandled rejection:', e.reason);
+  showLoadingError(e.reason || new Error('Unhandled promise rejection'));
+});
+window.addEventListener('error', (e) => {
+  console.error('[SmartLead] window error:', e.error || e.message);
+  showLoadingError(e.error || new Error(e.message || 'Unknown script error'));
+});
+
+// ── GOOGLE MAPS — open the actual business listing ─────────────────────
+// Strategy: build a text query of "name, address" AND append the OSM
+// coordinate with a tight zoom. Google Maps searches the text but biases
+// heavily toward the visible viewport, so it auto-snaps to the real listing
+// at that exact spot (showing photos, hours, reviews) instead of a
+// similarly-named business in another neighborhood.
+function mapsUrl(leadOrQuery, address, city) {
+  if (typeof leadOrQuery === 'object' && leadOrQuery) {
+    const l = leadOrQuery;
+    const hasCoords  = typeof l.lat === 'number' && typeof l.lon === 'number';
+    const hasAddress = l.address && l.address.trim().length > 0;
+
+    const textParts = [l.name, l.address || l.city].filter(Boolean);
+    const text = textParts.join(', ');
+
+    if (text && hasCoords) {
+      // /maps/search/<text>/@<lat>,<lon>,19z  — biased viewport + text search
+      return `https://www.google.com/maps/search/${encodeURIComponent(text)}/@${l.lat},${l.lon},19z`;
+    }
+    if (text) {
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
+    }
+    if (hasCoords) {
+      return `https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lon}`;
+    }
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.name || '')}`;
+  }
+  const query = (address || city)
+    ? [leadOrQuery, address || city].filter(Boolean).join(', ')
+    : (leadOrQuery || '');
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
 }
 
 // ── INJECT GLOBAL STYLES ───────────────────────────────────────────────
@@ -679,63 +729,357 @@ const GeoLocation = {
   }
 };
 
-// ── LEAD GENERATION — radius-enforced, specific addresses ──────────────
-async function generateLeads(biz, target, service, location, dealSize, radius) {
-  const searchArea = location || GeoLocation.label() || 'the user\'s local area';
-
-  const dealRanges = {
-    small:'$500–$2,000/month', medium:'$2,000–$10,000/month',
-    large:'$10,000–$50,000/month', enterprise:'$50,000+/month'
-  };
-
-  const prompt = `You are a hyper-local B2B sales intelligence engine.
-
-Search parameters:
-- Business seeking clients: ${biz}
-- Target customer type: ${target}
-- Service being offered: ${service}
-- Expected deal size: ${dealRanges[dealSize] || dealRanges.medium}
-- Search center: ${searchArea}
-- STRICT RADIUS: ${radius} miles — ALL businesses MUST be within ${radius} miles of ${searchArea}. Do NOT return any business outside this radius.
-
-Generate exactly 5 SPECIFIC, REAL-SOUNDING businesses that match the target customer type. Do NOT use generic names like "The Coffee Shop" or "Local Restaurant" — invent specific unique business names like "Carla's Coastal Grill" or "Brickell Brew Co." that sound like one specific real place.
-
-Return ONLY a valid JSON array. No markdown, no explanation. Each object must have EXACTLY these fields:
-{
-  "name": "Specific unique business name (not a generic name shared by many businesses)",
-  "address": "Full street address within ${radius} miles of ${searchArea}, e.g. 1240 Ocean Drive, Miami Beach, FL 33139",
-  "industry": "Specific industry sector",
-  "size": "e.g. 11-50 employees",
-  "city": "City, State",
-  "decisionMaker": "Specific job title",
-  "score": <integer 40-97>,
-  "monthly": <integer USD within deal size range>,
-  "annual": <monthly * 12>,
-  "painPoint": "One specific sentence about their main pain point",
-  "reason": "2-3 sentences explaining why this specific business is a strong lead",
-  "outreach": [
-    "Specific step 1 action referencing the company",
-    "Specific step 2 action",
-    "Specific step 3 action",
-    "Specific step 4 follow-up"
-  ],
-  "signals": ["Signal 1", "Signal 2", "Signal 3"]
+// ── PLACES — real businesses from OpenStreetMap (Nominatim + Overpass) ──
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error(`Request timed out after ${Math.round(timeoutMs/1000)}s`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-All 5 businesses must be within ${radius} miles of ${searchArea}. Vary scores naturally.`;
+const Places = {
+  async geocode(query) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } }, 10000);
+    if (!res.ok) throw new Error('Location lookup failed.');
+    const data = await res.json();
+    if (!data.length) throw new Error(`Couldn't find "${query}" on the map. Try a more specific location.`);
+    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon), displayName: data[0].display_name };
+  },
 
-  const res = await fetch(CONFIG.OR_URL, {
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':`Bearer ${CONFIG.OR_KEY}`},
-    body:JSON.stringify({model:CONFIG.OR_MODEL,max_tokens:2500,messages:[{role:'user',content:prompt}]})
-  });
-  if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e?.error?.message||`API error ${res.status}`); }
-  const data=await res.json();
-  const raw=data?.choices?.[0]?.message?.content||'';
-  const clean=raw.replace(/```json|```/g,'').trim();
-  const leads=JSON.parse(clean);
-  if (!Array.isArray(leads)||leads.length===0) throw new Error('No leads returned. Please try again.');
-  return leads.sort((a,b)=>b.score-a.score);
+  // Keyword → OSM tag dictionary. Order matters: first matching keyword wins,
+  // so longer/more-specific terms come first.
+  KEYWORD_MAP: [
+    { kw: ['dentist', 'dental'],                     tags: [{key:'amenity',value:'dentist'},{key:'healthcare',value:'dentist'}] },
+    { kw: ['vet', 'veterinar'],                      tags: [{key:'amenity',value:'veterinary'}] },
+    { kw: ['pharmac', 'drugstore', 'chemist'],       tags: [{key:'amenity',value:'pharmacy'},{key:'shop',value:'chemist'}] },
+    { kw: ['clinic', 'doctor', 'gp ', 'surgery', 'medical practice', 'physician'],
+                                                     tags: [{key:'amenity',value:'clinic'},{key:'amenity',value:'doctors'},{key:'healthcare',value:'clinic'},{key:'healthcare',value:'doctor'}] },
+    { kw: ['hospital'],                              tags: [{key:'amenity',value:'hospital'}] },
+    { kw: ['cafe', 'coffee', 'coffeeshop', 'coffee shop'], tags: [{key:'amenity',value:'cafe'}] },
+    { kw: ['bakery', 'bakeries'],                    tags: [{key:'shop',value:'bakery'}] },
+    { kw: ['bar', 'pub', 'tavern'],                  tags: [{key:'amenity',value:'bar'},{key:'amenity',value:'pub'}] },
+    { kw: ['restaurant', 'diner', 'bistro', 'eatery', 'eating'],
+                                                     tags: [{key:'amenity',value:'restaurant'},{key:'amenity',value:'fast_food'}] },
+    { kw: ['fast food', 'fast-food'],                tags: [{key:'amenity',value:'fast_food'}] },
+    { kw: ['hotel', 'motel', 'inn', 'hostel', 'lodging', 'bnb', 'b&b', 'bed and breakfast'],
+                                                     tags: [{key:'tourism',value:'hotel'},{key:'tourism',value:'motel'},{key:'tourism',value:'guest_house'}] },
+    { kw: ['gym', 'fitness', 'yoga', 'pilates', 'crossfit'],
+                                                     tags: [{key:'leisure',value:'fitness_centre'},{key:'leisure',value:'sports_centre'}] },
+    { kw: ['salon', 'barber', 'hair'],               tags: [{key:'shop',value:'hairdresser'},{key:'shop',value:'beauty'}] },
+    { kw: ['beauty', 'spa', 'nail'],                 tags: [{key:'shop',value:'beauty'},{key:'leisure',value:'spa'}] },
+    { kw: ['law firm', 'lawyer', 'attorney', 'legal'],
+                                                     tags: [{key:'office',value:'lawyer'}] },
+    { kw: ['accountant', 'accounting', 'bookkeep', 'cpa'],
+                                                     tags: [{key:'office',value:'accountant'}] },
+    { kw: ['real estate', 'realtor', 'estate agent'],tags: [{key:'office',value:'estate_agent'}] },
+    { kw: ['auto repair', 'car repair', 'mechanic', 'tire', 'tyre'],
+                                                     tags: [{key:'shop',value:'car_repair'},{key:'shop',value:'tyres'}] },
+    { kw: ['car dealer', 'auto dealer', 'dealership'], tags: [{key:'shop',value:'car'}] },
+    { kw: ['book', 'bookstore', 'bookshop'],         tags: [{key:'shop',value:'books'}] },
+    { kw: ['grocery', 'supermarket', 'convenience'], tags: [{key:'shop',value:'supermarket'},{key:'shop',value:'convenience'}] },
+    { kw: ['butcher'],                               tags: [{key:'shop',value:'butcher'}] },
+    { kw: ['florist', 'flower shop'],                tags: [{key:'shop',value:'florist'}] },
+    { kw: ['jewelry', 'jeweler', 'jewellery'],       tags: [{key:'shop',value:'jewelry'}] },
+    { kw: ['clothing', 'boutique', 'apparel', 'fashion'], tags: [{key:'shop',value:'clothes'}] },
+    { kw: ['shoe'],                                  tags: [{key:'shop',value:'shoes'}] },
+    { kw: ['electronics', 'computer', 'phone shop'], tags: [{key:'shop',value:'electronics'},{key:'shop',value:'mobile_phone'}] },
+    { kw: ['laundromat', 'laundry', 'dry clean'],    tags: [{key:'shop',value:'laundry'},{key:'shop',value:'dry_cleaning'}] },
+    { kw: ['pet shop', 'pet store'],                 tags: [{key:'shop',value:'pet'}] },
+    { kw: ['school', 'tutoring', 'tutor', 'academy'],tags: [{key:'amenity',value:'school'}] },
+    { kw: ['kindergarten', 'daycare', 'childcare'],  tags: [{key:'amenity',value:'kindergarten'},{key:'amenity',value:'childcare'}] },
+    { kw: ['church', 'mosque', 'synagogue', 'temple'], tags: [{key:'amenity',value:'place_of_worship'}] },
+    { kw: ['museum'],                                tags: [{key:'tourism',value:'museum'}] },
+    { kw: ['theater', 'theatre', 'cinema', 'movie'], tags: [{key:'amenity',value:'cinema'},{key:'amenity',value:'theatre'}] },
+    { kw: ['bank'],                                  tags: [{key:'amenity',value:'bank'}] },
+    { kw: ['insurance'],                             tags: [{key:'office',value:'insurance'}] }
+  ],
+
+  keywordClassify(target) {
+    const t = ' ' + (target || '').toLowerCase() + ' ';
+    for (const entry of this.KEYWORD_MAP) {
+      for (const k of entry.kw) {
+        if (t.includes(k)) return entry.tags.slice();
+      }
+    }
+    return null;
+  },
+
+  async classifyTarget(target, biz) {
+    // Fast path: keyword match — reliable and zero-latency
+    const kwMatch = this.keywordClassify(target);
+    if (kwMatch) {
+      console.log('[Places] keyword classifier matched:', target, '→', kwMatch);
+      return kwMatch.slice(0, 4);
+    }
+
+    // Fallback: ask the model. Only target is used as input — biz context
+    // was causing bleed-through (e.g. "marketing agency" → hotels).
+    const prompt = `Map this business category to OpenStreetMap (OSM) tag filters.
+
+Target business type: "${target}"
+
+Return ONLY a JSON array of 1-4 OSM tag filter objects. Use real OSM keys: amenity, shop, office, craft, healthcare, tourism, leisure.
+
+Examples:
+- "restaurants" → [{"key":"amenity","value":"restaurant"}]
+- "cafes" → [{"key":"amenity","value":"cafe"}]
+- "dental clinics" → [{"key":"amenity","value":"dentist"}]
+- "gyms" → [{"key":"leisure","value":"fitness_centre"}]
+- "law firms" → [{"key":"office","value":"lawyer"}]
+- "hotels" → [{"key":"tourism","value":"hotel"}]
+
+Return ONLY the JSON array, no markdown, no explanation.`;
+    const res = await fetchWithTimeout(CONFIG.OR_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CONFIG.OR_KEY}` },
+      body: JSON.stringify({ model: CONFIG.OR_MODEL, max_tokens: 200, messages: [{ role: 'user', content: prompt }] })
+    }, 15000);
+    if (!res.ok) throw new Error('Category classification failed.');
+    const data = await res.json();
+    const raw = (data?.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+    let filters = [];
+    try { filters = JSON.parse(raw); } catch {}
+    filters = (Array.isArray(filters) ? filters : [])
+      .filter(f => f && f.key && f.value && f.value !== '*');
+    if (!filters.length) {
+      filters = [
+        { key: 'amenity', value: 'restaurant' },
+        { key: 'amenity', value: 'cafe' },
+        { key: 'shop', value: 'convenience' }
+      ];
+    }
+    return filters.slice(0, 4);
+  },
+
+  async _runOverpass(query) {
+    const endpoints = [
+      'https://overpass.kumi.systems/api/interpreter',
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.openstreetmap.fr/api/interpreter'
+    ];
+    let lastErr;
+    for (const ep of endpoints) {
+      try {
+        const res = await fetchWithTimeout(ep, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'data=' + encodeURIComponent(query)
+        }, 12000);
+        if (res.ok) return await res.json();
+        lastErr = new Error(`${ep} → ${res.status}`);
+      } catch (err) { lastErr = err; }
+    }
+    throw new Error('All Overpass endpoints failed: ' + (lastErr?.message || 'unknown'));
+  },
+
+  async overpassSearch(lat, lon, radiusMiles, filters) {
+    const cappedMiles = Math.min(Math.max(radiusMiles, 5), 25);
+    const radiusMeters = Math.round(cappedMiles * 1609.34);
+    const elements = [];
+    const errors = [];
+
+    // Pass 1: exact key=value filters, all in parallel
+    const p1Queries = filters.map(f => {
+      const q = `[out:json][timeout:10];node["${f.key}"="${f.value}"]["name"](around:${radiusMeters},${lat},${lon});out body 25;`;
+      return this._runOverpass(q)
+        .then(data => ({ ok: true, elements: data?.elements || [] }))
+        .catch(err => ({ ok: false, label: `${f.key}=${f.value}`, message: err.message }));
+    });
+    const p1Results = await Promise.all(p1Queries);
+    let queriesRun = p1Results.length;
+    let queriesSucceeded = 0;
+    for (const r of p1Results) {
+      if (r.ok) { queriesSucceeded++; elements.push(...r.elements); }
+      else { errors.push(`${r.label}: ${r.message}`); }
+    }
+
+    // Pass 2: if still empty, relax to key-only queries (parallel)
+    if (elements.length === 0) {
+      const keys = [...new Set(filters.map(f => f.key))];
+      const p2Queries = keys.map(k => {
+        const q = `[out:json][timeout:10];node["${k}"]["name"](around:${radiusMeters},${lat},${lon});out body 25;`;
+        return this._runOverpass(q)
+          .then(data => ({ ok: true, elements: data?.elements || [] }))
+          .catch(err => ({ ok: false, label: k, message: err.message }));
+      });
+      const p2Results = await Promise.all(p2Queries);
+      queriesRun += p2Results.length;
+      for (const r of p2Results) {
+        if (r.ok) { queriesSucceeded++; elements.push(...r.elements); }
+        else { errors.push(`${r.label}: ${r.message}`); }
+      }
+    }
+
+    // If every single query failed, this is a network/endpoint problem,
+    // not a "no results" problem. Surface the real error.
+    if (queriesSucceeded === 0 && queriesRun > 0) {
+      throw new Error('Overpass API unreachable — all queries failed:\n' + errors.join('\n'));
+    }
+
+    const seen = new Set();
+    const places = [];
+    for (const el of elements) {
+      const t = el.tags || {};
+      const name = t.name;
+      if (!name) continue;
+
+      // Drop closed / defunct / demolished / under-construction places.
+      // OSM uses lifecycle-prefix keys and boolean marker tags for this.
+      if (this._isClosed(t)) continue;
+
+      const key = name.toLowerCase().trim();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const street = [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' ');
+      const cityPart = t['addr:city'] || '';
+      const statePart = t['addr:state'] || '';
+      const zipPart = t['addr:postcode'] || '';
+      const address = [street, cityPart, statePart, zipPart].filter(Boolean).join(', ');
+
+      const category = t.amenity || t.shop || t.office || t.craft || t.healthcare || t.tourism || t.leisure || '';
+      const pointLat = el.lat;
+      const pointLon = el.lon;
+      if (pointLat == null || pointLon == null) continue;
+
+      places.push({
+        name,
+        address,
+        city: cityPart,
+        category,
+        website: t.website || t['contact:website'] || '',
+        phone: t.phone || t['contact:phone'] || '',
+        lat: pointLat,
+        lon: pointLon
+      });
+    }
+    // Prefer places with an address, but keep the rest as backup
+    places.sort((a, b) => (b.address ? 1 : 0) - (a.address ? 1 : 0));
+    return places;
+  },
+
+  _isClosed(t) {
+    // Explicit boolean markers
+    if (t.disused === 'yes' || t.abandoned === 'yes' || t.closed === 'yes' || t.demolished === 'yes') return true;
+    if (t.opening_hours && /^closed$/i.test(t.opening_hours.trim())) return true;
+    if (t.state === 'closed' || t.status === 'closed' || t.operational_status === 'closed') return true;
+    // Lifecycle-prefix keys: disused:amenity=*, abandoned:shop=*, razed:*, demolished:*, construction:*, proposed:*, was:*
+    for (const k of Object.keys(t)) {
+      if (/^(disused|abandoned|razed|demolished|removed|ruins|construction|proposed|was):/i.test(k)) return true;
+    }
+    return false;
+  }
+};
+
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ── LEAD GENERATION — real businesses via OSM, enriched by AI ──────────
+async function generateLeads(biz, target, service, location, dealSize, radius) {
+  const searchArea = location || GeoLocation.label() || '';
+  if (!searchArea) {
+    throw new Error('Please enter a location so we can search for real businesses nearby.');
+  }
+
+  // 1 + 2 in parallel: geocode the area AND classify target → OSM filters
+  const [geo, filters] = await Promise.all([
+    Places.geocode(searchArea),
+    Places.classifyTarget(target, biz)
+  ]);
+
+  // 3. Query Overpass for real nearby businesses matching those filters
+  const effectiveRadius = Math.min(Math.max(radius, 5), 25);
+  let candidates = await Places.overpassSearch(geo.lat, geo.lon, radius, filters);
+  if (!candidates.length) {
+    throw new Error(`No real businesses matching "${target}" found within ${effectiveRadius} mi of ${searchArea}. Try a broader target type (e.g. "medical clinics" instead of "GP surgeries") or a different location.`);
+  }
+
+  // Keep top ~20 with addresses first, then randomly pick 5 for variety
+  const pool = candidates.slice(0, 20);
+  const picked = shuffleArray(pool).slice(0, Math.min(5, pool.length));
+
+  // 4. Enrich each real business with AI — ONE small call per lead, in parallel.
+  //    This is 5-10x faster than one huge call because Groq returns each small
+  //    response almost instantly and all calls run concurrently.
+  const dealRanges = {
+    small: '$500–$2,000/month', medium: '$2,000–$10,000/month',
+    large: '$10,000–$50,000/month', enterprise: '$50,000+/month'
+  };
+  const dealRange = dealRanges[dealSize] || dealRanges.medium;
+
+  async function enrichOne(place) {
+    const prompt = `Enrich this real business with B2B sales intelligence as JSON.
+
+Seller: ${biz}
+Service: ${service}
+Target customer type: ${target}
+Deal size: ${dealRange}
+
+Business (from OpenStreetMap — keep name/address/city EXACTLY):
+name: ${place.name}
+address: ${place.address || searchArea}
+city: ${place.city || searchArea}
+category: ${place.category}
+
+Return ONLY a JSON object, no markdown:
+{"name":"${place.name.replace(/"/g,'\\"')}","address":"${(place.address||searchArea).replace(/"/g,'\\"')}","city":"${(place.city||searchArea).replace(/"/g,'\\"')}","industry":"<sector>","size":"<e.g. 11-50 employees>","decisionMaker":"<job title>","score":<55-95>,"monthly":<USD in deal range>,"annual":<monthly*12>,"painPoint":"<one sentence>","reason":"<2-3 sentences why strong lead for ${biz}>","outreach":["<step1 mentioning ${place.name}>","<step2>","<step3>","<step4 follow-up>"],"signals":["<signal1>","<signal2>","<signal3>"]}`;
+
+    const res = await fetchWithTimeout(CONFIG.OR_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CONFIG.OR_KEY}` },
+      body: JSON.stringify({
+        model: CONFIG.OR_MODEL,
+        max_tokens: 600,
+        temperature: 0.7,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: prompt }]
+      })
+    }, 20000);
+    if (!res.ok) throw new Error(`Enrichment failed for ${place.name}: ${res.status}`);
+    const data = await res.json();
+    const raw = (data?.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+    const obj = JSON.parse(raw);
+    // Force OSM-truth fields and coerce all numerics — the 8b model sometimes
+    // returns "60000" as a string, which breaks the pipeline reduce.
+    const score   = Math.round(Number(obj.score)   || 0);
+    const monthly = Math.round(Number(obj.monthly) || 0);
+    const annual  = Math.round(Number(obj.annual)  || monthly * 12);
+    return {
+      ...obj,
+      score,
+      monthly,
+      annual,
+      name: place.name,
+      address: place.address || obj.address || searchArea,
+      city: place.city || obj.city || searchArea,
+      lat: place.lat,
+      lon: place.lon,
+      website: place.website,
+      phone: place.phone
+    };
+  }
+
+  const results = await Promise.allSettled(picked.map(enrichOne));
+  const enriched = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  if (!enriched.length) {
+    const firstErr = results.find(r => r.status === 'rejected');
+    throw new Error('All lead enrichment calls failed: ' + (firstErr?.reason?.message || 'unknown'));
+  }
+
+  return enriched.sort((a, b) => b.score - a.score);
 }
 
 // ── UTILITIES ──────────────────────────────────────────────────────────
@@ -768,6 +1112,10 @@ function showScreen(id) {
   if (id==='input-screen')   currentScreen='input';
   if (id==='loading-screen') currentScreen='loading';
   if (id==='results-screen') currentScreen='results';
+  // Resume background canvas animation only when returning to the input screen
+  if (id==='input-screen' && typeof window.__restartBgCanvas === 'function') {
+    window.__restartBgCanvas();
+  }
 }
 
 // ── LOADING ────────────────────────────────────────────────────────────
@@ -819,8 +1167,8 @@ function renderLeadCards(leads) {
   grid.innerHTML='';
   leads.forEach((lead,i)=>{
     const meta=getScoreMeta(lead.score),circ=2*Math.PI*30,isTop=i===0;
-    // Use full street address for precise Maps pinning
-    const url=mapsUrl(lead.address || `${lead.name} ${lead.city}`);
+    // Pass name + address so Google Maps pins the specific business and shows its name
+    const url=mapsUrl(lead);
 
     const card=document.createElement('div');
     card.className='lead-card';card.style.animationDelay=(i*0.07).toFixed(2)+'s';
@@ -931,7 +1279,7 @@ const SmartLead = {
       // Layer 2: AI validation — spelling-tolerant
       const [aiCheck] = await Promise.all([
         validateWithAI(biz, target, service),
-        new Promise(r => setTimeout(r, 900))
+        new Promise(r => setTimeout(r, 300))
       ]);
       if (!aiCheck.valid) {
         stopLoading();
@@ -949,8 +1297,15 @@ const SmartLead = {
       setTimeout(()=>{ State.set(leads,meta); showScreen('results-screen'); renderResults(leads,meta); }, 350);
 
     } catch(err) {
+      console.error('[SmartLead] generate() failed:', err);
+      showLoadingError(err);
       stopLoading();
-      setTimeout(()=>{ document.getElementById('forge-btn').disabled=false; showScreen('input-screen'); showValidationError(`Something went wrong: ${err.message}`); }, 300);
+      setTimeout(()=>{
+        document.getElementById('forge-btn').disabled=false;
+        showScreen('input-screen');
+        showValidationError(`Something went wrong: ${err.message}`);
+        hideLoadingError();
+      }, 6000);
     }
   },
 
@@ -1009,7 +1364,7 @@ const SmartLead = {
       l.city,l.size,l.decisionMaker,
       formatMoney(l.monthly),formatMoney(l.annual),
       `"${(l.painPoint||'').replace(/"/g,'""')}"`,
-      mapsUrl(l.address||`${l.name} ${l.city}`)
+      mapsUrl(l)
     ]);
     const csv=[h,...r].map(x=>x.join(',')).join('\n');
     const blob=new Blob([csv],{type:'text/csv'}),url=URL.createObjectURL(blob),a=document.createElement('a');
@@ -1039,9 +1394,11 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── CANVAS BACKGROUND ──────────────────────────────────────────────────
 (function initCanvas(){
   const canvas=document.getElementById('bg-canvas');if(!canvas)return;
-  const ctx=canvas.getContext('2d'),MAX_NODES=40,CONNECT_DIST=140;let W,H,nodes=[];
+  const ctx=canvas.getContext('2d'),MAX_NODES=40,CONNECT_DIST=140;let W,H,nodes=[],rafId=null;
   function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;nodes=Array.from({length:MAX_NODES},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.3,vy:(Math.random()-0.5)*0.3,r:Math.random()*1.5+0.5}));}
   function tick(t){
+    // Only animate while the input screen is active — saves CPU on results page
+    if (currentScreen !== 'input') { rafId = null; return; }
     ctx.clearRect(0,0,W,H);
     nodes.forEach(n=>{n.x+=n.vx;n.y+=n.vy;if(n.x<0||n.x>W)n.vx*=-1;if(n.y<0||n.y>H)n.vy*=-1;});
     for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
@@ -1049,7 +1406,9 @@ window.addEventListener('DOMContentLoaded', () => {
       if(dist<CONNECT_DIST){ctx.beginPath();ctx.moveTo(nodes[i].x,nodes[i].y);ctx.lineTo(nodes[j].x,nodes[j].y);ctx.strokeStyle=`rgba(0,212,255,${(1-dist/CONNECT_DIST)*0.12})`;ctx.lineWidth=0.5;ctx.stroke();}
     }
     nodes.forEach(n=>{const p=0.5+0.5*Math.sin(t*0.001+n.x);ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fillStyle=`rgba(0,212,255,${0.2+0.3*p})`;ctx.fill();});
-    requestAnimationFrame(tick);
+    rafId = requestAnimationFrame(tick);
   }
-  window.addEventListener('resize',resize);resize();requestAnimationFrame(tick);
+  function startTick(){ if (rafId == null) rafId = requestAnimationFrame(tick); }
+  window.__restartBgCanvas = startTick;
+  window.addEventListener('resize',resize);resize();startTick();
 })();
