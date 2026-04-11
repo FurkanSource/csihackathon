@@ -60,6 +60,26 @@ const IconX = ({ size = 14 }) => (
     <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
   </svg>
 )
+const IconLocate = ({ size = 14 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m2 12 2 0"/><path d="m20 12 2 0"/>
+  </svg>
+)
+
+/* ── Input Validation ── */
+function validateField(value, fieldName) {
+  const v = value.trim()
+  if (!v) return ''
+  if (v.length < 3) return `${fieldName} must be at least 3 characters`
+  if (!/[a-zA-Z]/.test(v)) return `${fieldName} must contain letters`
+  const clean = v.replace(/\s/g, '')
+  if (clean.length > 4 && new Set(clean.toLowerCase()).size <= 2) return `Please enter a valid ${fieldName.toLowerCase()}`
+  if (clean.length > 6) {
+    const vowels = (v.match(/[aeiouAEIOU]/g) || []).length
+    if (vowels === 0) return `Please enter a valid ${fieldName.toLowerCase()}`
+  }
+  return ''
+}
 
 /* ── Particle Burst Effect ── */
 function spawnBurst(x, y, container) {
@@ -100,6 +120,9 @@ export default function App() {
   const [service,   setService]   = useState('')
   const [location,  setLocation]  = useState('')
   const [dealSize,  setDealSize]  = useState('medium')
+  const [radius,    setRadius]    = useState(25)
+  const [detecting, setDetecting] = useState(false)
+  const [errors,    setErrors]    = useState({})
 
   // App state
   const [screen,     setScreen]   = useState(SCREENS.INPUT)
@@ -245,12 +268,40 @@ export default function App() {
     }
   }, [])
 
-  // ── GENERATE LEADS ────────────────────────────────────────────────
+  // ── DETECT LOCATION ─────────────────────────────────────────────
+  const detectLocation = () => {
+    if (!navigator.geolocation) { alert('Geolocation not supported by your browser.'); return }
+    setDetecting(true)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`, { headers: { 'Accept': 'application/json' } })
+          const data = await res.json()
+          const city = data.address?.city || data.address?.town || data.address?.village || ''
+          const state = data.address?.state || ''
+          if (city) setLocation(`${city}${state ? ', ' + state : ''}`)
+        } catch { setLocation(`${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`) }
+        setDetecting(false)
+      },
+      () => { alert('Location access denied. Please type your location manually.'); setDetecting(false) },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  // ── VALIDATE & GENERATE LEADS ─────────────────────────────────────
   const handleGenerate = async (e) => {
-    if (!bizType || !target || !service) {
-      alert('Please fill in Business Type, Target Customer, and Service Offered.')
-      return
-    }
+    const newErrors = {}
+    const bizErr = validateField(bizType, 'Business Type')
+    const tgtErr = validateField(target, 'Target Customer')
+    const svcErr = validateField(service, 'Service Offered')
+    if (!bizType.trim()) newErrors.bizType = 'Business Type is required'
+    else if (bizErr) newErrors.bizType = bizErr
+    if (!target.trim()) newErrors.target = 'Target Customer is required'
+    else if (tgtErr) newErrors.target = tgtErr
+    if (!service.trim()) newErrors.service = 'Service Offered is required'
+    else if (svcErr) newErrors.service = svcErr
+    if (Object.keys(newErrors).length) { setErrors(newErrors); return }
+    setErrors({})
     // Particle burst on button click
     if (appRef.current) {
       const rect = e.currentTarget.getBoundingClientRect()
@@ -262,7 +313,7 @@ export default function App() {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ biz_type: bizType, target, service, location, deal_size: dealSize })
+        body: JSON.stringify({ biz_type: bizType, target, service, location, deal_size: dealSize, radius })
       })
       if (!res.ok) throw new Error('Backend unavailable')
       const data = await res.json()
@@ -408,23 +459,41 @@ export default function App() {
                     <span className="form-file-label">lead_search.config</span>
                   </div>
 
-                  <div className="field">
+                  <div className={`field ${errors.bizType ? 'has-error' : ''}`}>
                     <label htmlFor="biz-type">Business Type</label>
-                    <input id="biz-type" value={bizType} onChange={e => setBizType(e.target.value)} placeholder="e.g. Digital Marketing Agency" />
+                    <input id="biz-type" value={bizType} onChange={e => { setBizType(e.target.value); setErrors(er => ({...er, bizType: ''})) }} placeholder="e.g. Digital Marketing Agency" />
+                    {errors.bizType && <div className="field-error">{errors.bizType}</div>}
                   </div>
-                  <div className="field">
+                  <div className={`field ${errors.target ? 'has-error' : ''}`}>
                     <label htmlFor="target">Target Customer</label>
-                    <input id="target" value={target} onChange={e => setTarget(e.target.value)} placeholder="e.g. Small restaurants and cafes" />
+                    <input id="target" value={target} onChange={e => { setTarget(e.target.value); setErrors(er => ({...er, target: ''})) }} placeholder="e.g. Small restaurants and cafes" />
+                    {errors.target && <div className="field-error">{errors.target}</div>}
                   </div>
-                  <div className="field">
+                  <div className={`field ${errors.service ? 'has-error' : ''}`}>
                     <label htmlFor="service">Service Offered</label>
-                    <input id="service" value={service} onChange={e => setService(e.target.value)} placeholder="e.g. Social media management & paid ads" />
+                    <input id="service" value={service} onChange={e => { setService(e.target.value); setErrors(er => ({...er, service: ''})) }} placeholder="e.g. Social media management & paid ads" />
+                    {errors.service && <div className="field-error">{errors.service}</div>}
                   </div>
-                  <div className="field-row">
-                    <div className="field">
-                      <label htmlFor="location">Location (optional)</label>
+
+                  <div className="field location-field">
+                    <label htmlFor="location">Location</label>
+                    <div className="location-input-wrap">
                       <input id="location" value={location} onChange={e => setLocation(e.target.value)} placeholder="e.g. Miami, FL" />
+                      <button type="button" className="detect-btn" onClick={detectLocation} disabled={detecting} title="Use my location">
+                        {detecting ? <span className="detect-spinner" /> : <IconLocate size={14} />}
+                      </button>
                     </div>
+                  </div>
+
+                  <div className="field radius-field">
+                    <label htmlFor="radius">Search Radius: <span className="radius-value">{radius} miles</span></label>
+                    <input type="range" id="radius" className="radius-slider" min="5" max="100" step="5" value={radius} onChange={e => setRadius(Number(e.target.value))} />
+                    <div className="radius-labels">
+                      <span>5 mi</span><span>50 mi</span><span>100 mi</span>
+                    </div>
+                  </div>
+
+                  <div className="field-row">
                     <div className="field">
                       <label htmlFor="deal-size">Deal Size</label>
                       <select id="deal-size" value={dealSize} onChange={e => setDealSize(e.target.value)}>

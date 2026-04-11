@@ -171,28 +171,120 @@
 .field label {
   display: block; font-family: var(--font-mono); font-size: 10px;
   color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px;
-  transition: color 0.25s;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.field:focus-within label { color: var(--accent); }
+.field:focus-within label { color: var(--accent); text-shadow: 0 0 8px rgba(0,255,255,0.3); transform: translateX(3px); }
 
 .field input, .field select {
   width: 100%;
   background: rgba(10,12,22,0.6);
-  border: 1px solid rgba(0,255,255,0.1);
+  border: 1px solid rgba(0,255,255,0.08);
   border-radius: var(--radius-sm);
   color: var(--text); font-size: 14px;
   padding: 10px 14px; outline: none;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-appearance: none; appearance: none;
+}
+
+/* Color-changing hover → cycles through neon colors */
+.field input:hover, .field select:hover {
+  border-color: rgba(124,58,237,0.35);
+  box-shadow: 0 0 12px rgba(124,58,237,0.08);
+  background: rgba(12,14,24,0.7);
 }
 .field input:focus, .field select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0,255,255,0.1), 0 0 25px rgba(0,255,255,0.08);
-  transform: translateY(-1px);
+  box-shadow: 0 0 0 3px rgba(0,255,255,0.1), 0 0 30px rgba(0,255,255,0.1);
+  background: rgba(10,12,22,0.8);
+  transform: translateY(-2px) scale(1.01);
 }
-.field input::placeholder { color: var(--text4); }
+.field:nth-child(2) input:hover { border-color: rgba(255,0,110,0.3); box-shadow: 0 0 12px rgba(255,0,110,0.08); }
+.field:nth-child(2) input:focus { border-color: var(--pink); box-shadow: 0 0 0 3px rgba(255,0,110,0.08), 0 0 30px rgba(255,0,110,0.08); }
+.field:nth-child(2):focus-within label { color: var(--pink); text-shadow: 0 0 8px rgba(255,0,110,0.3); }
+.field:nth-child(3) input:hover { border-color: rgba(5,255,161,0.3); box-shadow: 0 0 12px rgba(5,255,161,0.08); }
+.field:nth-child(3) input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(5,255,161,0.08), 0 0 30px rgba(5,255,161,0.08); }
+.field:nth-child(3):focus-within label { color: var(--green); text-shadow: 0 0 8px rgba(5,255,161,0.3); }
 
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 20px 14px; }
+.field input::placeholder { color: var(--text4); transition: color 0.3s; }
+.field input:focus::placeholder { color: var(--text3); }
+
+/* ── VALIDATION ERRORS ── */
+.field.has-error input {
+  border-color: rgba(255,59,92,0.4);
+  box-shadow: 0 0 12px rgba(255,59,92,0.08);
+  animation: shakeField 0.4s ease;
+}
+.field.has-error label { color: var(--red); }
+.field-error {
+  font-family: var(--font-mono); font-size: 9px; color: var(--red);
+  margin-top: 4px; letter-spacing: 0.05em;
+  animation: fadeUp 0.3s ease both;
+}
+
+@keyframes shakeField {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+/* ── LOCATION FIELD ── */
+.location-field { margin: 0 20px 14px; }
+.location-input-wrap {
+  display: flex; gap: 6px; align-items: stretch;
+}
+.location-input-wrap input { flex: 1; }
+.detect-btn {
+  width: 40px; flex-shrink: 0;
+  background: rgba(0,255,255,0.06); border: 1px solid rgba(0,255,255,0.15);
+  border-radius: var(--radius-sm); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.detect-btn:hover { background: rgba(0,255,255,0.12); border-color: rgba(0,255,255,0.3); box-shadow: 0 0 15px rgba(0,255,255,0.12); transform: scale(1.05); }
+.detect-btn:disabled { opacity: 0.5; cursor: wait; }
+.detect-spinner {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(0,255,255,0.2); border-top-color: var(--accent);
+  animation: spinRing 0.6s linear infinite;
+}
+
+/* ── RADIUS SLIDER ── */
+.radius-field { margin: 0 20px 14px; }
+.radius-value { color: var(--accent); font-weight: 500; }
+.radius-slider {
+  width: 100%; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(0,255,255,0.15), rgba(124,58,237,0.15), rgba(255,0,110,0.15));
+  -webkit-appearance: none; appearance: none;
+  outline: none; cursor: pointer;
+  margin-top: 4px;
+}
+.radius-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  box-shadow: 0 0 12px rgba(0,255,255,0.4), 0 2px 8px rgba(0,0,0,0.3);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.radius-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 20px rgba(0,255,255,0.5), 0 4px 12px rgba(0,0,0,0.4);
+}
+.radius-slider::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%; border: none;
+  background: linear-gradient(135deg, var(--accent), var(--purple));
+  box-shadow: 0 0 12px rgba(0,255,255,0.4);
+  cursor: pointer;
+}
+.radius-labels {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 8px; color: var(--text4);
+  margin-top: 4px; letter-spacing: 0.05em;
+}
+
+.field-row { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 0 20px 14px; }
 .field-row .field { margin: 0; }
 
 /* ── CTA BUTTON (Neon 3D Glow) ── */
