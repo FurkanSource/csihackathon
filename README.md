@@ -1,6 +1,6 @@
 <<<<<<< HEAD
 # ⚡ SmartLead
-### Built at Dolphin Hacks 2025 — Business Track
+### Built at Dolphin Hacks 2026 — Business Track
 
 > AI-powered business lead discovery, scoring, and outreach platform.
 
