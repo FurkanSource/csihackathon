@@ -26,9 +26,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── CONFIG ────────────────────────────────────────────────────────────
-API_KEY    = os.environ.get("GROQ_API_KEY", "***REMOVED***")
+API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
-AI_AVAILABLE = bool(API_KEY and API_KEY != "YOUR_API_KEY_HERE")
+AI_AVAILABLE = bool(API_KEY)
 DB_PATH    = os.path.join(os.path.dirname(__file__), "smartlead.db")
 PORT       = 5500
 DEBUG      = True
@@ -284,6 +284,13 @@ def chat():
             "reason":  "gibberish"
         })
 
+    if not AI_AVAILABLE:
+        return jsonify({
+            "blocked": True,
+            "reply": "AI chat is temporarily unavailable.",
+            "reason": "ai_unavailable",
+        }), 503
+
     # ── 2. Rate limit check ───────────────────────────────────────────
     limit = check_rate_limit(ip)
     if not limit["allowed"]:
@@ -317,13 +324,14 @@ def chat():
 
     # ── 5. Call AI ────────────────────────────────────────────────────
     try:
-        if not AI_AVAILABLE:
-            reply = _fallback_reply(message)
-        else:
-            reply = call_groq(messages, max_tokens=300, temperature=0.5)
-    except Exception as e:
-        print(f"[Chat] AI call failed: {e}")
-        reply = "I'm having trouble connecting right now. Please try again in a moment."
+        reply = call_groq(messages, max_tokens=300, temperature=0.5)
+    except Exception as exc:
+        print(f"[Chat] AI call failed: {exc}")
+        return jsonify({
+            "blocked": True,
+            "reply": "AI chat is temporarily unavailable.",
+            "reason": "ai_upstream_error",
+        }), 502
 
     # ── 6. Increment rate limit + log ─────────────────────────────────
     increment_rate_limit(ip)
@@ -349,24 +357,6 @@ def _log_chat(ip, message, reply, blocked=False, reason=""):
         conn.close()
     except Exception as e:
         print(f"[Chat log] DB write failed: {e}")
-
-
-def _fallback_reply(message: str) -> str:
-    """Canned responses when AI is unavailable."""
-    lower = message.lower()
-    if "score" in lower:
-        return "Lead scores range from 0-100. Hot leads score 85+, Strong leads 70+, Warm leads 55+, and Cold leads are below 55. Higher scores indicate stronger buying intent signals."
-    if "outreach" in lower:
-        return "Each lead card includes a 4-step outreach strategy tailored to that company. Click any lead card to expand it and see the full strategy."
-    if "export" in lower or "csv" in lower:
-        return "Click the 'Export CSV' button on the results screen to download all your leads as a spreadsheet with scores, deal values, and contact details."
-    if "form" in lower or "input" in lower or "fill" in lower:
-        return "Fill in Business Type (what you do), Target Customer (who you sell to), and Service Offered (your specific service). Be specific — better inputs produce better leads."
-    if "filter" in lower or "sort" in lower:
-        return "Use the filter buttons to show only Hot (85+), Strong (70+), or Warm (55+) leads. The sort dropdown lets you order by score, deal value, or company name."
-    if "save" in lower or "database" in lower:
-        return "Click 'Save to DB' to persist your leads to the database panel. This lets you track which leads you've saved for follow-up."
-    return "I can help you understand SmartLead's features — lead scoring, outreach strategies, filtering, exporting, and more. What would you like to know?"
 
 
 # ── EXISTING ROUTES ───────────────────────────────────────────────────
