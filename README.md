@@ -2,6 +2,8 @@
 
 **Dolphin Hacks 2026 — Business Track Winner**
 
+**[Live demo →](https://csihackathon-plum.vercel.app)** — frontend only. The Flask backend is not deployed, so the demo falls back to generated sample leads instead of live OpenStreetMap results. Run locally (below) for real data.
+
 SmartLead is a hackathon-built lead discovery and qualification platform. A user describes their business, target customer, service, and location; SmartLead finds nearby businesses, evaluates their fit, estimates potential deal value, and suggests outreach steps.
 
 > Built as a three-person, 12-hour hackathon prototype at the MLH-sponsored Dolphin Hacks 2026.
@@ -31,7 +33,7 @@ The browser never receives the Groq credential. AI requests are sent through the
 
 ## Tech Stack
 
-- **Frontend:** React 18, Vite 5, CSS
+- **Frontend:** React 18, Vite 8, CSS
 - **Backend:** Python, Flask, Flask-CORS
 - **Data:** SQLite, OpenStreetMap Nominatim and Overpass
 - **AI:** Groq API
