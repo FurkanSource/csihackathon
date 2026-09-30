@@ -8,10 +8,6 @@ SmartLead is a hackathon-built lead discovery and qualification platform. A user
 
 > Built as a three-person, 12-hour hackathon prototype at the MLH-sponsored Dolphin Hacks 2026.
 
-## Project ownership
-
-This was an AI-assisted, three-person team project. **Furkan Candar led product direction, demo design, and the final pitch**, scoping prospect search, AI qualification, saved leads, and CSV export around a sales workflow. His contribution focused on product and presentation. The Flask backend, React client, integrations, and automated tests were developed with AI assistance.
-
 ## Features
 
 | Feature | Description |
